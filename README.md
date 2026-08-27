@@ -61,6 +61,8 @@ The application exposes `GET /api/health` for deployment verification.
 
 `GET /api/v1/me` is protected by Firebase ID-token verification and returns the application profile resolved from the verified Firebase UID. See [authentication and authorization](docs/authentication-and-authorization.md).
 
+Sprint 1 planning, service, member-role, personal availability, and upcoming-assignment operations are exposed under `/api/v1`. See the [server API contract](docs/api.md).
+
 ## Database
 
 The server domain uses PostgreSQL with Drizzle ORM. Copy `.env.example` to `.env.local`, set `DATABASE_URL`, then use the version-controlled migration workflow:
@@ -83,6 +85,7 @@ The synthetic legacy-data spike is reproducible with `npm run migration:legacy-s
 - [Domain model](docs/domain-model.md)
 - [Authentication and authorization](docs/authentication-and-authorization.md)
 - [Legacy migration spike](docs/legacy-migration-spike.md)
+- [Server API](docs/api.md)
 - [AI coding instructions](AGENTS.md)
 
 ## Core principle

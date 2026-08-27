@@ -59,11 +59,24 @@ npm run build
 
 The application exposes `GET /api/health` for deployment verification.
 
+## Database
+
+The server domain uses PostgreSQL with Drizzle ORM. Copy `.env.example` to `.env.local`, set `DATABASE_URL`, then use the version-controlled migration workflow:
+
+```bash
+npm run db:generate
+npm run db:check
+npm run db:migrate
+```
+
+Tests apply the real migration to a fresh in-memory PostgreSQL instance; they never require or modify a shared database. See the [domain model](docs/domain-model.md) and [Drizzle decision record](docs/adr/0001-use-drizzle-for-postgresql.md).
+
 ## Documentation
 
 - [Product specification](docs/product-spec.md)
 - [Architecture](docs/architecture.md)
 - [Capstone delivery plan](docs/capstone-plan.md)
+- [Domain model](docs/domain-model.md)
 - [AI coding instructions](AGENTS.md)
 
 ## Core principle

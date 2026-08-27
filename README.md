@@ -6,7 +6,7 @@ An explainable AI-assisted church volunteer scheduling platform that generates f
 
 This repository is the new Quantic MSSE Capstone codebase. It does not contain the pre-existing SJSM production application. That application is treated as a legacy reference and pre-Capstone baseline.
 
-Current phase: specification and architecture.
+Current phase: Sprint 1 foundation.
 
 ## Problem
 
@@ -32,6 +32,33 @@ SJSM SmartRoster will provide:
 - Resend for transactional email
 - GitHub Actions for CI/CD
 
+## Local development
+
+Prerequisites:
+
+- Node.js 22 LTS (Next.js requires Node.js 20.9 or newer)
+- npm 10 or newer
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`. The root route redirects to the English experience at `/en`; the Simplified Chinese experience is available at `/zh`.
+
+## Quality checks
+
+Run the same checks used by CI:
+
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+The application exposes `GET /api/health` for deployment verification.
+
 ## Documentation
 
 - [Product specification](docs/product-spec.md)
@@ -42,4 +69,3 @@ SJSM SmartRoster will provide:
 ## Core principle
 
 AI proposes and explains. Authorized humans review and decide.
-

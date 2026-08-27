@@ -73,6 +73,8 @@ npm run db:migrate
 
 Tests apply the real migration to a fresh in-memory PostgreSQL instance; they never require or modify a shared database. See the [domain model](docs/domain-model.md) and [Drizzle decision record](docs/adr/0001-use-drizzle-for-postgresql.md).
 
+The synthetic legacy-data spike is reproducible with `npm run migration:legacy-spike`. It refuses non-synthetic email domains and writes only aggregate validation evidence. See the [legacy migration spike](docs/legacy-migration-spike.md).
+
 ## Documentation
 
 - [Product specification](docs/product-spec.md)
@@ -80,6 +82,7 @@ Tests apply the real migration to a fresh in-memory PostgreSQL instance; they ne
 - [Capstone delivery plan](docs/capstone-plan.md)
 - [Domain model](docs/domain-model.md)
 - [Authentication and authorization](docs/authentication-and-authorization.md)
+- [Legacy migration spike](docs/legacy-migration-spike.md)
 - [AI coding instructions](AGENTS.md)
 
 ## Core principle

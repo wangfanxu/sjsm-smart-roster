@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "migration:legacy-spike": "node scripts/legacy-migration-spike.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

@@ -1,0 +1,113 @@
+import { ApiError } from "@/api/errors";
+import type {
+  Actor,
+  AvailabilityInput,
+  DateRange,
+  DomainRepository,
+  MemberRoleInput,
+  PlanningPeriodInput,
+  ServiceInput,
+} from "./types";
+
+const applicationTimeZone = "Asia/Singapore";
+
+function calendarDateInTimeZone(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: applicationTimeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((candidate) => candidate.type === type)?.value;
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function validateDateRange(range: DateRange) {
+  if (range.from > range.to) {
+    throw new ApiError("invalid_date_range", 400, "from must be on or before to");
+  }
+  if (range.to > addDays(range.from, 366)) {
+    throw new ApiError("date_range_too_large", 400, "Date range cannot exceed 366 days");
+  }
+}
+
+export class SmartRosterService {
+  constructor(
+    private readonly repository: DomainRepository,
+    private readonly now: () => Date = () => new Date(),
+  ) {}
+
+  listPlanningPeriods() {
+    return this.repository.listPlanningPeriods();
+  }
+
+  createPlanningPeriod(input: PlanningPeriodInput, actor: Actor) {
+    return this.repository.createPlanningPeriod(input, actor.userId);
+  }
+
+  listServices(planningPeriodId: string) {
+    return this.repository.listServices(planningPeriodId);
+  }
+
+  async createService(input: ServiceInput, actor: Actor) {
+    const period = await this.repository.getPlanningPeriod(input.planningPeriodId);
+    if (!period) throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+    const serviceDate = calendarDateInTimeZone(input.startsAt);
+    if (serviceDate < period.startsOn || serviceDate > period.endsOn) {
+      throw new ApiError(
+        "service_outside_planning_period",
+        400,
+        "Service date must fall inside the planning period",
+      );
+    }
+    return this.repository.createService(input, actor.userId);
+  }
+
+  listRoles() {
+    return this.repository.listRoles();
+  }
+
+  replaceMemberRoles(userId: string, capabilities: MemberRoleInput, actor: Actor) {
+    return this.repository.replaceMemberRoles(userId, capabilities, actor.userId);
+  }
+
+  listMyAvailability(userId: string, input: Partial<DateRange>) {
+    const today = calendarDateInTimeZone(this.now());
+    const range = { from: input.from ?? today, to: input.to ?? addDays(today, 90) };
+    validateDateRange(range);
+    return this.repository.listAvailability(userId, range);
+  }
+
+  setMyAvailability(userId: string, input: AvailabilityInput) {
+    const today = calendarDateInTimeZone(this.now());
+    if (input.serviceDate < today) {
+      throw new ApiError("past_availability_date", 400, "Past availability dates cannot be changed");
+    }
+    return this.repository.upsertAvailability(userId, input, userId);
+  }
+
+  async listMyUpcomingAssignments(userId: string, from?: Date, to?: Date) {
+    const effectiveFrom = from ?? this.now();
+    if (to && to < effectiveFrom) {
+      throw new ApiError("invalid_date_range", 400, "to must be after from");
+    }
+    const assignments = await this.repository.listUpcomingAssignments(userId, effectiveFrom, to);
+    return assignments.map((assignment) => ({
+      ...assignment,
+      startsAt: assignment.startsAt.toISOString(),
+      serviceDate: calendarDateInTimeZone(assignment.startsAt),
+      serviceTime: new Intl.DateTimeFormat("en-GB", {
+        timeZone: applicationTimeZone,
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      }).format(assignment.startsAt),
+    }));
+  }
+}

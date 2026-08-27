@@ -14,3 +14,10 @@ export function createDatabase(connectionString = process.env.DATABASE_URL) {
     db: drizzle(client, { schema }),
   };
 }
+
+let databaseConnection: ReturnType<typeof createDatabase> | undefined;
+
+export function getDatabaseConnection() {
+  databaseConnection ??= createDatabase();
+  return databaseConnection;
+}

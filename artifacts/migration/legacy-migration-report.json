@@ -1,0 +1,58 @@
+{
+  "fixtureVersion": 1,
+  "synthetic": true,
+  "containsPersonalData": false,
+  "sourceCounts": {
+    "users": 7,
+    "events": 2,
+    "availability": 1,
+    "serviceRequests": 1
+  },
+  "targetCounts": {
+    "users": 7,
+    "roles": 8,
+    "userRoles": 11,
+    "planningPeriods": 1,
+    "services": 2,
+    "serviceRoleRequirements": 14,
+    "availability": 1,
+    "rosterCandidates": 1,
+    "assignments": 11,
+    "replacementRequests": 1,
+    "auditEvents": 1
+  },
+  "checks": [
+    {
+      "name": "required_fields",
+      "passed": true
+    },
+    {
+      "name": "reserved_test_emails",
+      "passed": true
+    },
+    {
+      "name": "unique_legacy_ids",
+      "passed": true
+    },
+    {
+      "name": "relationship_references",
+      "passed": true
+    },
+    {
+      "name": "one_role_per_service_user",
+      "passed": true
+    },
+    {
+      "name": "planning_period_bounds",
+      "passed": true
+    }
+  ],
+  "assumptions": [
+    "Legacy users collection document IDs are Firebase UIDs.",
+    "Legacy availability stores exceptions only; isAvailable=true records are omitted.",
+    "Legacy event roles define both required roles and manual assignments.",
+    "Role capacity is at least one and otherwise inferred from assigned array length.",
+    "Legacy calendar dates are interpreted in Asia/Singapore.",
+    "Imported assignments remain a draft candidate and are never auto-published."
+  ]
+}

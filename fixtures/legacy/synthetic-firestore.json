@@ -1,0 +1,138 @@
+{
+  "metadata": {
+    "fixtureVersion": 1,
+    "synthetic": true,
+    "containsPersonalData": false,
+    "timeZone": "Asia/Singapore",
+    "utcOffset": "+08:00",
+    "planningPeriod": {
+      "legacyId": "period-2026-09-10",
+      "name": "Synthetic September–October 2026",
+      "startsOn": "2026-09-01",
+      "endsOn": "2026-10-31"
+    }
+  },
+  "collections": {
+    "users": [
+      {
+        "id": "user-admin",
+        "email": "admin@example.test",
+        "displayName": "Alex Admin",
+        "role": "admin",
+        "primaryInstrument": "Pianist",
+        "secondaryInstruments": ["Projectionist"],
+        "isActive": true
+      },
+      {
+        "id": "user-leader",
+        "email": "leader@example.test",
+        "displayName": "Taylor Leader",
+        "role": "lead-singer-leader",
+        "primaryInstrument": "Lead Singer",
+        "secondaryInstruments": ["Supporting Singer"],
+        "isActive": true
+      },
+      {
+        "id": "user-drummer-a",
+        "email": "drummer.a@example.test",
+        "displayName": "Jordan Rhythm",
+        "role": "member",
+        "primaryInstrument": "Drummer",
+        "secondaryInstruments": [],
+        "isActive": true
+      },
+      {
+        "id": "user-drummer-b",
+        "email": "drummer.b@example.test",
+        "displayName": "Morgan Beat",
+        "role": "member",
+        "primaryInstrument": "Drummer",
+        "secondaryInstruments": [],
+        "isActive": true
+      },
+      {
+        "id": "user-guitar",
+        "email": "guitar@example.test",
+        "displayName": "Casey Strings",
+        "role": "member",
+        "primaryInstrument": "Guitarist",
+        "secondaryInstruments": ["Bassist"],
+        "isActive": true
+      },
+      {
+        "id": "user-bass",
+        "email": "bass@example.test",
+        "displayName": "Riley Lowend",
+        "role": "member",
+        "primaryInstrument": "Bassist",
+        "secondaryInstruments": ["Guitarist"],
+        "isActive": true
+      },
+      {
+        "id": "user-support",
+        "email": "support@example.test",
+        "displayName": "Jamie Harmony",
+        "role": "member",
+        "primaryInstrument": "Supporting Singer",
+        "secondaryInstruments": [],
+        "isActive": true
+      }
+    ],
+    "events": [
+      {
+        "id": "event-2026-09-05",
+        "title": "Synthetic Worship Service",
+        "date": { "seconds": 1788537600, "nanoseconds": 0 },
+        "time": "09:00",
+        "notes": "Generated fixture only",
+        "status": "pending",
+        "roles": {
+          "Lead Singer": "user-leader",
+          "Supporting Singer": ["user-support"],
+          "Pianist": "user-admin",
+          "Drummer": "user-drummer-a",
+          "Guitarist": "user-guitar",
+          "Bassist": "user-bass",
+          "PA Operator": ""
+        }
+      },
+      {
+        "id": "event-2026-09-12",
+        "title": "Synthetic Communion Service",
+        "date": { "seconds": 1789142400, "nanoseconds": 0 },
+        "time": "09:00",
+        "notes": "Generated fixture only",
+        "status": "pending",
+        "roles": {
+          "Lead Singer": "user-leader",
+          "Supporting Singer": [],
+          "Pianist": "user-admin",
+          "Drummer": "user-drummer-a",
+          "Guitarist": "user-guitar",
+          "Bassist": "user-bass",
+          "PA Operator": ""
+        }
+      }
+    ],
+    "availability": [
+      {
+        "id": "availability-support-2026-09-12",
+        "userId": "user-support",
+        "date": { "seconds": 1789142400, "nanoseconds": 0 },
+        "isAvailable": false,
+        "note": "Synthetic conflict"
+      }
+    ],
+    "serviceRequests": [
+      {
+        "id": "request-drummer-replacement",
+        "eventId": "event-2026-09-12",
+        "requesterId": "user-drummer-a",
+        "replacementId": "user-drummer-b",
+        "role": "Drummer",
+        "reason": "Synthetic replacement request",
+        "status": "pending"
+      }
+    ]
+  }
+}

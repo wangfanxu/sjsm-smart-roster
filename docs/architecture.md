@@ -16,15 +16,16 @@ flowchart TD
     Web --> Email[Email provider]
 ```
 
-## 3. Deployment direction
+## 3. Deployment architecture
 
-- Firebase Hosting remains the public front door where practical.
-- The Next.js runtime is deployed on Cloud Run through a Hosting rewrite, or on Firebase App Hosting.
-- PostgreSQL initially uses a low-cost managed provider.
+- Firebase App Hosting is the public front door and managed Next.js runtime.
+- App Hosting builds from GitHub, stores the image in Artifact Registry, runs it on Cloud Run, and serves it through Cloud CDN.
+- PostgreSQL uses Neon in Singapore with a pooled runtime connection.
 - Minimum running instances remain zero in non-critical environments to control cost.
-- Production secrets are stored in the hosting platform's secret manager.
+- Production secrets are stored in Google Cloud Secret Manager and referenced by `apphosting.yaml`.
+- Firebase Admin uses platform-provided Application Default Credentials; no service-account key is deployed.
 
-The final choice between Hosting plus Cloud Run and App Hosting will be recorded as an ADR after a deployment spike.
+The decision, alternatives, and cost implications are recorded in [ADR 0002](adr/0002-use-firebase-app-hosting-and-neon.md). Operational steps and deployment evidence are in the [deployment runbook](deployment.md).
 
 ## 4. Application boundaries
 
@@ -110,4 +111,3 @@ The authenticated user ID is injected by the server and is never accepted from m
 5. Plan a maintenance window for final migration if the church adopts the new system.
 
 Dual-write is not an MVP requirement. The Capstone demonstration must not depend on live production member data.
-

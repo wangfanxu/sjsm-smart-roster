@@ -57,7 +57,7 @@ npm test
 npm run build
 ```
 
-The application exposes `GET /api/health` for deployment verification.
+The application exposes `GET /api/health` for deployment verification. Firebase App Hosting and Neon PostgreSQL are the selected low-traffic deployment path; see the [deployment runbook](docs/deployment.md) and [hosting ADR](docs/adr/0002-use-firebase-app-hosting-and-neon.md).
 
 `GET /api/v1/me` is protected by Firebase ID-token verification and returns the application profile resolved from the verified Firebase UID. See [authentication and authorization](docs/authentication-and-authorization.md).
 
@@ -86,6 +86,8 @@ The synthetic legacy-data spike is reproducible with `npm run migration:legacy-s
 - [Authentication and authorization](docs/authentication-and-authorization.md)
 - [Legacy migration spike](docs/legacy-migration-spike.md)
 - [Server API](docs/api.md)
+- [Deployment runbook](docs/deployment.md)
+- [Hosting and database ADR](docs/adr/0002-use-firebase-app-hosting-and-neon.md)
 - [AI coding instructions](AGENTS.md)
 
 ## Core principle

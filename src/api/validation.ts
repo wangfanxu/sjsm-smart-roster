@@ -92,6 +92,19 @@ export const assignmentRangeQuery = z.object({
   to: z.iso.datetime({ offset: true }).optional(),
 });
 
+export const candidateGenerationInput = z
+  .object({
+    weights: z
+      .object({
+        primaryRole: z.number().int().min(0).max(100).optional(),
+        preferredAvailability: z.number().int().min(0).max(100).optional(),
+        loadBalance: z.number().int().min(0).max(100).optional(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
 export const uuidParameter = z.uuid();
 
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {

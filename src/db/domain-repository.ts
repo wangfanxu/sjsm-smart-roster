@@ -4,8 +4,10 @@ import type {
   AvailabilityInput,
   DateRange,
   DomainRepository,
+  GeneratedCandidateDraft,
   MemberRoleInput,
   PlanningPeriodInput,
+  RosterGenerationSource,
   ServiceInput,
 } from "@/domain/types";
 import * as schema from "./schema";
@@ -216,6 +218,178 @@ export function createDomainRepository(
           ),
         )
         .orderBy(asc(users.id));
+    },
+
+    async getRosterGenerationSource(planningPeriodId: string) {
+      const [period] = await database
+        .select({
+          id: planningPeriods.id,
+          startsOn: planningPeriods.startsOn,
+          endsOn: planningPeriods.endsOn,
+        })
+        .from(planningPeriods)
+        .where(eq(planningPeriods.id, planningPeriodId))
+        .limit(1);
+      if (!period) return null;
+
+      const serviceRecords = await database
+        .select({ id: services.id, startsAt: services.startsAt })
+        .from(services)
+        .where(eq(services.planningPeriodId, planningPeriodId))
+        .orderBy(asc(services.startsAt), asc(services.id));
+      const requirementRecords = await database
+        .select({
+          serviceId: serviceRoleRequirements.serviceId,
+          roleId: serviceRoleRequirements.roleId,
+          requiredCount: serviceRoleRequirements.requiredCount,
+        })
+        .from(serviceRoleRequirements)
+        .innerJoin(services, eq(serviceRoleRequirements.serviceId, services.id))
+        .where(eq(services.planningPeriodId, planningPeriodId))
+        .orderBy(asc(serviceRoleRequirements.roleId));
+      const capabilityRecords = await database
+        .select({
+          userId: users.id,
+          isActive: users.isActive,
+          roleId: userRoles.roleId,
+          proficiency: userRoles.proficiency,
+        })
+        .from(userRoles)
+        .innerJoin(users, eq(userRoles.userId, users.id))
+        .orderBy(asc(users.id), asc(userRoles.roleId));
+      const availabilityRecords = await database
+        .select({
+          userId: availability.userId,
+          serviceDate: availability.serviceDate,
+          status: availability.status,
+        })
+        .from(availability)
+        .where(
+          and(
+            gte(availability.serviceDate, period.startsOn),
+            lte(availability.serviceDate, period.endsOn),
+          ),
+        );
+
+      const requirementsByService = new Map<
+        string,
+        Array<{ roleId: string; requiredCount: number }>
+      >();
+      for (const requirement of requirementRecords) {
+        const requirements = requirementsByService.get(requirement.serviceId) ?? [];
+        requirements.push({
+          roleId: requirement.roleId,
+          requiredCount: requirement.requiredCount,
+        });
+        requirementsByService.set(requirement.serviceId, requirements);
+      }
+
+      const volunteersById = new Map<
+        string,
+        {
+          userId: string;
+          isActive: boolean;
+          capabilities: Array<{
+            roleId: string;
+            proficiency: "primary" | "secondary";
+          }>;
+          availability: Record<string, "available" | "unavailable" | "preferred">;
+        }
+      >();
+      for (const capability of capabilityRecords) {
+        const volunteer = volunteersById.get(capability.userId) ?? {
+          userId: capability.userId,
+          isActive: capability.isActive,
+          capabilities: [],
+          availability: {},
+        };
+        volunteer.capabilities.push({
+          roleId: capability.roleId,
+          proficiency: capability.proficiency,
+        });
+        volunteersById.set(capability.userId, volunteer);
+      }
+      for (const record of availabilityRecords) {
+        const volunteer = volunteersById.get(record.userId);
+        if (volunteer) volunteer.availability[record.serviceDate] = record.status;
+      }
+
+      return {
+        planningPeriodId,
+        services: serviceRecords.map((service) => ({
+          ...service,
+          requirements: requirementsByService.get(service.id) ?? [],
+        })),
+        volunteers: [...volunteersById.values()],
+      } satisfies RosterGenerationSource;
+    },
+
+    async saveGeneratedCandidate(candidate: GeneratedCandidateDraft, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [latest] = await transaction
+          .select({
+            version: sql<number>`coalesce(max(${rosterCandidates.version}), 0)`,
+          })
+          .from(rosterCandidates)
+          .where(eq(rosterCandidates.planningPeriodId, candidate.planningPeriodId));
+        const version = Number(latest.version) + 1;
+        const [record] = await transaction
+          .insert(rosterCandidates)
+          .values({
+            planningPeriodId: candidate.planningPeriodId,
+            version,
+            status: "draft",
+            hardConstraintsSatisfied: candidate.hardConstraintsSatisfied,
+            objectiveScore: candidate.objectiveScore.toFixed(4),
+            configuration: candidate.configuration,
+            explanation: candidate.explanation,
+            createdBy: actorUserId,
+          })
+          .returning();
+        const insertedAssignments = candidate.assignments.length
+          ? await transaction
+              .insert(assignments)
+              .values(
+                candidate.assignments.map((assignment) => ({
+                  candidateId: record.id,
+                  ...assignment,
+                  source: "solver" as const,
+                })),
+              )
+              .returning({
+                id: assignments.id,
+                serviceId: assignments.serviceId,
+                roleId: assignments.roleId,
+                userId: assignments.userId,
+              })
+          : [];
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "roster_candidate.generated",
+          entityType: "roster_candidate",
+          entityId: record.id,
+          metadata: {
+            planningPeriodId: candidate.planningPeriodId,
+            version,
+            assignmentCount: candidate.assignments.length,
+            unfilledRoleCount: candidate.unfilledRoles.length,
+            hardConstraintsSatisfied: candidate.hardConstraintsSatisfied,
+          },
+        });
+        return {
+          candidate: {
+            id: record.id,
+            planningPeriodId: record.planningPeriodId,
+            version: record.version,
+            status: "draft" as const,
+            hardConstraintsSatisfied: record.hardConstraintsSatisfied,
+            objectiveScore: record.objectiveScore,
+            configuration: record.configuration,
+            explanation: record.explanation,
+          },
+          assignments: insertedAssignments,
+        };
+      });
     },
   };
 }

@@ -213,4 +213,12 @@ export class SmartRosterService {
     const persisted = await this.repository.saveGeneratedCandidate(draft, actor.userId);
     return { ...persisted, unfilledRoles: draft.unfilledRoles };
   }
+
+  async publishCandidate(planningPeriodId: string, candidateId: string, actor: Actor) {
+    const detail = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!detail || detail.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+    return this.repository.publishRosterCandidate(candidateId, actor.userId);
+  }
 }

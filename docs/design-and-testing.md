@@ -123,13 +123,13 @@ The intended test pyramid ([architecture.md §8](architecture.md#8-testing-strat
 All tests run against a real PostgreSQL-compatible engine (PGlite) executing the
 actual committed migration — chosen in [ADR 0001](adr/0001-use-drizzle-for-postgresql.md)
 specifically so integration tests exercise real SQL constraints instead of a mocked
-repository. Current suite (`npm test`, Vitest): **11 test files, 59 tests, all
+repository. Current suite (`npm test`, Vitest): **11 test files, 64 tests, all
 passing**.
 
 | File | Covers |
 | --- | --- |
 | `src/db/schema.test.ts` | Migration applies cleanly; schema-level constraints (uniqueness, check constraints) behave as designed. |
-| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including the roster-candidate generation endpoint. |
+| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, and publication. |
 | `src/domain/smart-roster-service.test.ts` | Domain service methods (planning periods, services, roles, availability, assignment listing) against a fake `DomainRepository`. |
 | `src/domain/roster-generator.test.ts` | The constraint-based roster generator: hard-constraint enforcement (inactive/unavailable/unqualified volunteers excluded), infeasibility reporting for unfilled roles, soft-constraint scoring (primary-role fit, availability preference, load balance), coverage/fairness measures (US-04), and lock-aware regeneration including infeasible-lock detection (US-05). |
 | `src/auth/firebase-token-verifier.test.ts`, `src/auth/authorize.test.ts`, `src/auth/permissions.test.ts` | Firebase ID-token verification and role-based authorization, including negative/denied cases. |
@@ -182,7 +182,7 @@ suite gives evidence for both.
 | US-03 Generate a candidate roster | Done (#3, PR #24) | `src/domain/roster-generator.ts`, `src/app/api/v1/planning-periods/[periodId]/candidates` |
 | US-04 Review fairness and explanations | Done (#4) | `src/domain/roster-generator.ts` (coverage/fairness metrics), `GET .../candidates`, `GET .../candidates/{candidateId}` |
 | US-05 Lock and regenerate | Done (#5) | `PATCH .../candidates/{candidateId}/assignments/{assignmentId}`, `POST .../candidates/{candidateId}/regenerate`, `regenerateRosterCandidate` in `src/domain/roster-generator.ts` |
-| US-06 Publish a roster | Open (#6) | `roster_candidates.status`, partial-unique/check constraints (schema already in place) |
+| US-06 Publish a roster | Done (#6) | `POST .../candidates/{candidateId}/publish`, `publishRosterCandidate` in `src/db/domain-repository.ts` |
 | US-07 Ask for my next assignment | Open (#7) | assistant tool boundary, [architecture.md §7](architecture.md#7-ai-tool-boundary) |
 | US-08 Update availability through conversation | Open (#8) | prepare/confirm tool pair, [architecture.md §7](architecture.md#7-ai-tool-boundary) |
 | US-09 Notify assigned volunteers | Open (#9) | `notification_deliveries` (schema already in place) |

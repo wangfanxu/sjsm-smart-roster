@@ -175,6 +175,10 @@ export interface DomainRepository {
     isLocked: boolean,
     actorUserId: string,
   ): Promise<{ id: string; isLocked: boolean }>;
+  publishRosterCandidate(
+    candidateId: string,
+    actorUserId: string,
+  ): Promise<{ id: string; planningPeriodId: string; version: number; status: "published" }>;
 }
 
 export type Actor = Pick<AuthenticatedPrincipal, "userId">;

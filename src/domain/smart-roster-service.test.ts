@@ -20,6 +20,7 @@ function repositoryStub(): DomainRepository {
     listRosterCandidates: vi.fn(),
     getRosterCandidateDetail: vi.fn(),
     setAssignmentLock: vi.fn(),
+    publishRosterCandidate: vi.fn(),
   };
 }
 
@@ -263,5 +264,29 @@ describe("SmartRosterService", () => {
       },
     });
     expect(repository.saveGeneratedCandidate).not.toHaveBeenCalled();
+  });
+
+  it("rejects publishing a candidate from a different period", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue({
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "other-period",
+        version: 1,
+        status: "draft",
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1000.0000",
+        configuration: {},
+        explanation: {},
+        generatedAt: new Date("2026-08-27T00:00:00Z"),
+      },
+      assignments: [],
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.publishCandidate("period", "candidate", { userId: "administrator" }),
+    ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
+    expect(repository.publishRosterCandidate).not.toHaveBeenCalled();
   });
 });

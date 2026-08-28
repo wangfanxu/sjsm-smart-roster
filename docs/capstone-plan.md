@@ -10,7 +10,8 @@ Before final submission:
 - document which capabilities existed before the Capstone;
 - cite any reused code and justify why it was reused;
 - use this repository's commit history, issues, pull requests, tests, and deployments as the primary evidence of Capstone work;
-- share the final repository with the GitHub account `quantic-grader`.
+- share the final repository with the GitHub account `quantic-grader` (invited as a read-access collaborator);
+- maintain the [task board](https://github.com/users/wangfanxu/projects/1) and the [design and testing document](design-and-testing.md) as required Capstone submission components.
 
 ## 2. Delivery scope
 

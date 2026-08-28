@@ -6,6 +6,7 @@ export class ApiError extends Error {
     public readonly code: string,
     public readonly status: 400 | 404 | 409,
     message: string,
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = "ApiError";
@@ -13,7 +14,20 @@ export class ApiError extends Error {
 }
 
 export function apiErrorResponse(error: unknown): Response {
-  if (error instanceof AuthError || error instanceof ApiError) {
+  if (error instanceof ApiError) {
+    return Response.json(
+      {
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.details !== undefined ? { details: error.details } : {}),
+        },
+      },
+      { status: error.status },
+    );
+  }
+
+  if (error instanceof AuthError) {
     return Response.json(
       { error: { code: error.code, message: error.message } },
       { status: error.status },

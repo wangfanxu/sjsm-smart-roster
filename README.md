@@ -61,7 +61,15 @@ The application exposes `GET /api/health` for deployment verification. Firebase 
 
 `GET /api/v1/me` is protected by Firebase ID-token verification and returns the application profile resolved from the verified Firebase UID. See [authentication and authorization](docs/authentication-and-authorization.md).
 
-Sprint 1 planning, service, member-role, personal availability, and upcoming-assignment operations are exposed under `/api/v1`. See the [server API contract](docs/api.md).
+Sprint 1 planning, service, member-role, personal availability, and upcoming-assignment operations are exposed under `/api/v1`. Sprint 2 adds roster generation, review, locking/regeneration, and publication. See the [server API contract](docs/api.md).
+
+## Conversational assistant
+
+`POST /api/v1/assistant/ask` answers a volunteer's question about their own next assignment in English or Chinese. It requires `ANTHROPIC_API_KEY` (and optionally `ASSISTANT_MODEL`, default `claude-opus-5`) in the environment; automated tests never call the real API. Evaluate representative English and Chinese prompts against the real model with:
+
+```bash
+ANTHROPIC_API_KEY=... npm run assistant:eval
+```
 
 ## Database
 

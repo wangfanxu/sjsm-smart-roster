@@ -111,6 +111,12 @@ export const assignmentLockInput = z
   })
   .strict();
 
+export const assistantAskInput = z
+  .object({
+    message: z.string().trim().min(1).max(500),
+  })
+  .strict();
+
 export const uuidParameter = z.uuid();
 
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {

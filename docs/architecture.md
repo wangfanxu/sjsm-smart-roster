@@ -85,13 +85,23 @@ Database constraints and transactions protect invariants in addition to applicat
 
 Initial assistant tools:
 
-- `get_my_next_assignment`
+- `get_my_next_assignment` — implemented (`POST /api/v1/assistant/ask`, US-07)
 - `get_my_assignments_for_period`
 - `get_my_availability`
 - `prepare_mark_unavailable`
 - `confirm_mark_unavailable`
 
 The authenticated user ID is injected by the server and is never accepted from model-generated arguments.
+
+`get_my_next_assignment` is implemented as an LLM structured-output classification
+(`src/assistant/anthropic-intent-classifier.ts`) over three allowlisted outcomes —
+the supported tool, `unsupported_request`, or `clarification_needed` — plus
+locale detection (`en`/`zh`). The server executes the actual structured query
+(`SmartRosterService.listMyUpcomingAssignments`) and composes the reply from a
+fixed, per-locale template (`src/assistant/reply-templates.ts`); the LLM never
+authors the final user-facing sentence and never supplies a user ID. Any
+classifier failure (parse error, rate limit, network error) degrades to a
+safe `ambiguous` clarification rather than a 500.
 
 ## 8. Testing strategy
 

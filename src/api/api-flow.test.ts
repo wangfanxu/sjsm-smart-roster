@@ -17,6 +17,7 @@ import {
 import { handleCandidateDetailGet } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/route";
 import { handleAssignmentLockPatch } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/assignments/[assignmentId]/route";
 import { handleCandidateRegeneratePost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/regenerate/route";
+import { handleCandidatePublishPost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/publish/route";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -455,7 +456,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
       dependencies("firebase-lock-admin"),
     );
     return (await response.json()) as {
-      candidate: { id: string; version: number };
+      candidate: { id: string; version: number; hardConstraintsSatisfied: boolean };
       assignments: Array<{ id: string; serviceId: string; roleId: string; userId: string }>;
     };
   }
@@ -646,5 +647,127 @@ describe("Sprint 2 lock and regenerate flow", () => {
     await pglite.exec(
       `UPDATE users SET is_active = true WHERE id = '${assignmentToLock.userId}'`,
     );
+  });
+
+  const firebaseUidByUserId: Record<string, string> = {
+    [lockVolunteerId]: "firebase-lock-volunteer",
+    [lockOtherUserId]: "firebase-lock-other",
+  };
+
+  it("publishes a draft candidate atomically, supersedes the previous published one, and lets the assigned volunteer view it", async () => {
+    const draftA = await generateDraft();
+    const publishA = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draftA.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draftA.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    expect(publishA.status).toBe(200);
+
+    const draftB = await generateDraft();
+    const publishB = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draftB.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draftB.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const publishBBody = (await publishB.json()) as { candidate: { id: string; status: string } };
+
+    expect(publishB.status).toBe(200);
+    expect(publishBBody.candidate).toMatchObject({ id: draftB.candidate.id, status: "published" });
+
+    const statuses = await pglite.query<{ id: string; status: string }>(`
+      SELECT id, status FROM roster_candidates WHERE planning_period_id = '${lockPeriodId}' ORDER BY version
+    `);
+    expect(statuses.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: draftA.candidate.id, status: "superseded" }),
+        expect.objectContaining({ id: draftB.candidate.id, status: "published" }),
+      ]),
+    );
+    expect(statuses.rows.filter((row) => row.status === "published")).toHaveLength(1);
+
+    const audited = await pglite.query<{ action: string }>(`
+      SELECT action FROM audit_events
+      WHERE entity_id = '${draftB.candidate.id}' AND action = 'roster_candidate.published'
+    `);
+    expect(audited.rows).toHaveLength(1);
+
+    const [assignmentToView] = draftB.assignments;
+    const assignmentsResponse = await handleAssignmentsGet(
+      request("/api/v1/me/assignments"),
+      dependencies(firebaseUidByUserId[assignmentToView.userId]),
+    );
+    const assignmentsBody = (await assignmentsResponse.json()) as {
+      assignments: Array<{ serviceId: string }>;
+    };
+    expect(assignmentsBody.assignments).toEqual(
+      expect.arrayContaining([expect.objectContaining({ serviceId: assignmentToView.serviceId })]),
+    );
+  });
+
+  it("denies publishing to volunteers", async () => {
+    const draft = await generateDraft();
+    const response = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects publishing a candidate that is not a draft", async () => {
+    const draft = await generateDraft();
+    await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+
+    const response = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("candidate_not_publishable");
+  });
+
+  it("rejects publishing a candidate that does not satisfy hard constraints", async () => {
+    const unfillableRoleId = "00000000-0000-4000-a000-000000000109";
+    const unfillableServiceId = "00000000-0000-4000-a000-000000000110";
+    await pglite.exec(`
+      INSERT INTO roles (id, slug, name) VALUES ('${unfillableRoleId}', 'lock-trumpet', 'Trumpet');
+      INSERT INTO services (id, planning_period_id, title, starts_at)
+      VALUES ('${unfillableServiceId}', '${lockPeriodId}', 'Unfillable Service', '2026-09-19T01:00:00Z');
+      INSERT INTO service_role_requirements (service_id, role_id, required_count)
+      VALUES ('${unfillableServiceId}', '${unfillableRoleId}', 1);
+    `);
+
+    const draft = await generateDraft();
+    expect(draft.candidate.hardConstraintsSatisfied).toBe(false);
+
+    const response = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("roster_infeasible");
   });
 });

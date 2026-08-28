@@ -490,5 +490,71 @@ export function createDomainRepository(
         return updated;
       });
     },
+
+    async publishRosterCandidate(candidateId: string, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [candidate] = await transaction
+          .select({
+            id: rosterCandidates.id,
+            planningPeriodId: rosterCandidates.planningPeriodId,
+            version: rosterCandidates.version,
+            status: rosterCandidates.status,
+            hardConstraintsSatisfied: rosterCandidates.hardConstraintsSatisfied,
+          })
+          .from(rosterCandidates)
+          .where(eq(rosterCandidates.id, candidateId))
+          .limit(1);
+        if (!candidate) throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+        if (candidate.status !== "draft") {
+          throw new ApiError("candidate_not_publishable", 409, "Only a draft candidate can be published");
+        }
+        if (!candidate.hardConstraintsSatisfied) {
+          throw new ApiError(
+            "roster_infeasible",
+            409,
+            "This candidate does not satisfy all hard constraints and cannot be published",
+          );
+        }
+
+        const superseded = await transaction
+          .update(rosterCandidates)
+          .set({ status: "superseded" })
+          .where(
+            and(
+              eq(rosterCandidates.planningPeriodId, candidate.planningPeriodId),
+              eq(rosterCandidates.status, "published"),
+            ),
+          )
+          .returning({ id: rosterCandidates.id });
+
+        const [published] = await transaction
+          .update(rosterCandidates)
+          .set({ status: "published" })
+          .where(and(eq(rosterCandidates.id, candidateId), eq(rosterCandidates.status, "draft")))
+          .returning({
+            id: rosterCandidates.id,
+            planningPeriodId: rosterCandidates.planningPeriodId,
+            version: rosterCandidates.version,
+            status: rosterCandidates.status,
+          });
+        if (!published) {
+          throw new ApiError("candidate_not_publishable", 409, "Only a draft candidate can be published");
+        }
+
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "roster_candidate.published",
+          entityType: "roster_candidate",
+          entityId: candidateId,
+          metadata: {
+            planningPeriodId: candidate.planningPeriodId,
+            version: candidate.version,
+            supersededCandidateIds: superseded.map((row) => row.id),
+          },
+        });
+
+        return { ...published, status: "published" as const };
+      });
+    },
   };
 }

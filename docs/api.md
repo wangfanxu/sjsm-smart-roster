@@ -16,6 +16,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `GET` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}` | Administrator | Get a roster candidate's score, explanation, and enriched assignments |
 | `PATCH` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/assignments/{assignmentId}` | Administrator | Lock or unlock an assignment on a draft candidate |
 | `POST` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/regenerate` | Administrator | Regenerate a candidate, keeping locked assignments and recalculating the rest |
+| `POST` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/publish` | Administrator | Publish a draft candidate as the period's official roster |
 | `GET` | `/api/v1/roles` | Authenticated | List service-role definitions |
 | `PUT` | `/api/v1/users/{userId}/roles` | Administrator | Replace a member's role capabilities |
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
@@ -191,3 +192,23 @@ dropping or overriding the lock, and no new candidate version is created:
 `requirement_exceeded`, or `service_not_found`. The candidate that was
 regenerated from is never modified or deleted, so it remains fully
 auditable alongside the new version.
+
+## Publishing a roster
+
+`POST /api/v1/planning-periods/{periodId}/candidates/{candidateId}/publish`
+publishes a `draft` candidate as the planning period's official roster.
+Requires the `roster:publish` permission (administrator only).
+
+In one transaction: any candidate currently `published` for the period is
+moved to `superseded`, the target candidate is moved to `published` only if
+it is still a `draft` at that moment, and an audit event
+(`roster_candidate.published`) is recorded. If either step fails, the whole
+transaction rolls back — publication either fully succeeds or leaves the
+previous state completely unchanged, so there is never a partial or
+duplicate official roster.
+
+Rejected with `409 candidate_not_publishable` if the candidate is not (or is
+no longer) a draft, and `409 roster_infeasible` if it does not satisfy every
+hard constraint (`hardConstraintsSatisfied: false`). Once published, the
+assigned volunteers' `GET /api/v1/me/assignments` immediately reflects the
+new roster, since that endpoint only ever reads `published` candidates.

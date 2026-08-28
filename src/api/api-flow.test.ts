@@ -10,7 +10,11 @@ import {
   handlePlanningPeriodsPost,
 } from "@/app/api/v1/planning-periods/route";
 import { handleServicesPost } from "@/app/api/v1/planning-periods/[periodId]/services/route";
-import { handleCandidatesPost } from "@/app/api/v1/planning-periods/[periodId]/candidates/route";
+import {
+  handleCandidatesGet,
+  handleCandidatesPost,
+} from "@/app/api/v1/planning-periods/[periodId]/candidates/route";
+import { handleCandidateDetailGet } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/route";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -289,6 +293,94 @@ describe("Sprint 1 protected API flow", () => {
         body: JSON.stringify({}),
       }),
       { params: Promise.resolve({ periodId }) },
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("lists roster candidates for a planning period newest version first", async () => {
+    const response = await handleCandidatesGet(
+      request(`/api/v1/planning-periods/${periodId}/candidates`),
+      { params: Promise.resolve({ periodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as {
+      candidates: Array<{ id: string; version: number; status: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.candidates.map((candidate) => candidate.version)).toEqual([2, 1]);
+    expect(body.candidates[1]).toMatchObject({ id: candidateId, status: "published" });
+  });
+
+  it("denies listing roster candidates to volunteers", async () => {
+    const response = await handleCandidatesGet(
+      request(`/api/v1/planning-periods/${periodId}/candidates`),
+      { params: Promise.resolve({ periodId }) },
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("reports a structured error when listing candidates for an unknown planning period", async () => {
+    const unknownPeriodId = "00000000-0000-4000-a000-000000000099";
+    const response = await handleCandidatesGet(
+      request(`/api/v1/planning-periods/${unknownPeriodId}/candidates`),
+      { params: Promise.resolve({ periodId: unknownPeriodId }) },
+      dependencies("firebase-admin"),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("returns candidate detail with enriched assignments for review", async () => {
+    const response = await handleCandidateDetailGet(
+      request(`/api/v1/planning-periods/${periodId}/candidates/${candidateId}`),
+      { params: Promise.resolve({ periodId, candidateId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as {
+      candidate: { id: string; status: string };
+      assignments: Array<{
+        serviceTitle: string;
+        roleName: string;
+        userDisplayName: string;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.candidate).toMatchObject({ id: candidateId, status: "published" });
+    expect(body.assignments).toEqual([
+      expect.objectContaining({
+        serviceTitle: "First Service",
+        roleName: "Drummer",
+        userDisplayName: "Volunteer",
+      }),
+      expect.objectContaining({
+        serviceTitle: "Second Service",
+        roleName: "Drummer",
+        userDisplayName: "Volunteer",
+      }),
+    ]);
+  });
+
+  it("returns a not-found error for a candidate id that does not exist", async () => {
+    const unknownCandidateId = "00000000-0000-4000-a000-000000000098";
+    const response = await handleCandidateDetailGet(
+      request(`/api/v1/planning-periods/${periodId}/candidates/${unknownCandidateId}`),
+      { params: Promise.resolve({ periodId, candidateId: unknownCandidateId }) },
+      dependencies("firebase-admin"),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
+  it("denies candidate detail review to volunteers", async () => {
+    const response = await handleCandidateDetailGet(
+      request(`/api/v1/planning-periods/${periodId}/candidates/${candidateId}`),
+      { params: Promise.resolve({ periodId, candidateId }) },
       dependencies(),
     );
 

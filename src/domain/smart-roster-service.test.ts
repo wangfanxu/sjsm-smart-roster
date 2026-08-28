@@ -17,6 +17,8 @@ function repositoryStub(): DomainRepository {
     listEligibleUsersForServiceRole: vi.fn(),
     getRosterGenerationSource: vi.fn(),
     saveGeneratedCandidate: vi.fn(),
+    listRosterCandidates: vi.fn(),
+    getRosterCandidateDetail: vi.fn(),
   };
 }
 
@@ -138,5 +140,40 @@ describe("SmartRosterService", () => {
       expect.objectContaining({ hardConstraintsSatisfied: true }),
       "administrator",
     );
+  });
+
+  it("rejects listing roster candidates for an unknown planning period", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getPlanningPeriod).mockResolvedValue(null);
+    const service = new SmartRosterService(repository, now);
+
+    await expect(service.listRosterCandidates("missing")).rejects.toMatchObject({
+      code: "planning_period_not_found",
+      status: 404,
+    });
+    expect(repository.listRosterCandidates).not.toHaveBeenCalled();
+  });
+
+  it("rejects a candidate detail request when the candidate belongs to a different period", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue({
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "other-period",
+        version: 1,
+        status: "draft",
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1000.0000",
+        configuration: {},
+        explanation: {},
+        generatedAt: new Date("2026-08-27T00:00:00Z"),
+      },
+      assignments: [],
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.getRosterCandidateDetail("period", "candidate"),
+    ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
   });
 });

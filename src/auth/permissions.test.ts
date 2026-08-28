@@ -14,6 +14,7 @@ describe("role permissions", () => {
     expect(hasPermission("team_leader", "team:read")).toBe(true);
     expect(hasPermission("team_leader", "replacement:review")).toBe(true);
     expect(hasPermission("team_leader", "roster:generate")).toBe(false);
+    expect(hasPermission("team_leader", "roster:review")).toBe(false);
     expect(hasPermission("team_leader", "user:manage")).toBe(false);
   });
 
@@ -21,6 +22,7 @@ describe("role permissions", () => {
     expect(hasPermission("administrator", "team:read")).toBe(true);
     expect(hasPermission("administrator", "planning:manage")).toBe(true);
     expect(hasPermission("administrator", "roster:generate")).toBe(true);
+    expect(hasPermission("administrator", "roster:review")).toBe(true);
     expect(hasPermission("administrator", "roster:publish")).toBe(true);
     expect(hasPermission("administrator", "notification:send")).toBe(true);
   });

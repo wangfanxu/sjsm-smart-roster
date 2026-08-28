@@ -97,6 +97,35 @@ export type PersistedCandidate = Readonly<{
   assignments: ReadonlyArray<GeneratedAssignment & { id: string }>;
 }>;
 
+export type RosterCandidateSummary = Readonly<{
+  id: string;
+  planningPeriodId: string;
+  version: number;
+  status: "draft" | "published" | "superseded";
+  hardConstraintsSatisfied: boolean;
+  objectiveScore: string | null;
+  explanation: Record<string, unknown>;
+  generatedAt: Date;
+}>;
+
+export type RosterCandidateAssignmentDetail = Readonly<{
+  id: string;
+  serviceId: string;
+  serviceTitle: string;
+  serviceStartsAt: Date;
+  roleId: string;
+  roleName: string;
+  userId: string;
+  userDisplayName: string;
+  isLocked: boolean;
+  source: "solver" | "manual";
+}>;
+
+export type RosterCandidateDetail = Readonly<{
+  candidate: RosterCandidateSummary & { configuration: Record<string, unknown> };
+  assignments: ReadonlyArray<RosterCandidateAssignmentDetail>;
+}>;
+
 export interface DomainRepository {
   listPlanningPeriods(): Promise<unknown[]>;
   createPlanningPeriod(input: PlanningPeriodInput, actorUserId: string): Promise<unknown>;
@@ -137,6 +166,8 @@ export interface DomainRepository {
     candidate: GeneratedCandidateDraft,
     actorUserId: string,
   ): Promise<PersistedCandidate>;
+  listRosterCandidates(planningPeriodId: string): Promise<RosterCandidateSummary[]>;
+  getRosterCandidateDetail(candidateId: string): Promise<RosterCandidateDetail | null>;
 }
 
 export type Actor = Pick<AuthenticatedPrincipal, "userId">;

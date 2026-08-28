@@ -85,14 +85,13 @@ Do not use a protected API as the public health check because it intentionally r
 
 ## Deployment evidence
 
-Complete this section after the first authorized cloud deployment.
-
 | Evidence | Value |
 | --- | --- |
-| Public URL | Pending billing-authorized backend creation |
-| First deployed commit | Pending |
-| App Hosting rollout | Pending |
-| `/api/health` result | Pending |
-| Verification timestamp | Pending |
+| Public URL | [smart-roster--sjsm-smart-roster.asia-southeast1.hosted.app](https://smart-roster--sjsm-smart-roster.asia-southeast1.hosted.app/en) |
+| First deployed commit | `8362d4f23d3447fd56aace2f03a68f287ca95283` |
+| App Hosting rollout | `fah-sjsm-smart-roster-smart-roster-rollout-2026-08-28-001` — success |
+| `/en` result | HTTP 200 |
+| `/api/health` result | HTTP 200 — `{"service":"sjsm-smart-roster","status":"ok"}` |
+| Verification timestamp | `2026-08-28T14:09:38Z` |
 
-Issue #14 remains open until these fields contain successful deployment evidence.
+This evidence satisfies the deployment acceptance criteria in Issue #14.

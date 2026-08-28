@@ -1,11 +1,17 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { z } from "zod";
+import { GoogleGenAI } from "@google/genai";
 
-const classificationOutputSchema = z.object({
-  tool: z.enum(["get_my_next_assignment", "unsupported_request", "clarification_needed"]),
-  locale: z.enum(["en", "zh"]),
-});
+const classificationResponseJsonSchema = {
+  type: "object",
+  properties: {
+    tool: {
+      type: "string",
+      enum: ["get_my_next_assignment", "unsupported_request", "clarification_needed"],
+    },
+    locale: { type: "string", enum: ["en", "zh"] },
+  },
+  required: ["tool", "locale"],
+  propertyOrdering: ["tool", "locale"],
+};
 
 const classificationSystemPrompt = `You classify a church volunteer's message to a scheduling assistant into exactly one allowlisted tool, and detect the message's language.
 
@@ -33,28 +39,30 @@ const cases = [
 ];
 
 function requireApiKey() {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.GEMINI_API_KEY) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. This evaluation calls the real Anthropic API and is intentionally excluded from `npm test`.",
+      "GEMINI_API_KEY is not set. This evaluation calls the real Gemini API and is intentionally excluded from `npm test`.",
     );
   }
 }
 
 async function classify(client, model, message) {
-  const response = await client.messages.parse({
+  const response = await client.models.generateContent({
     model,
-    max_tokens: 256,
-    system: classificationSystemPrompt,
-    messages: [{ role: "user", content: message }],
-    output_config: { format: zodOutputFormat(classificationOutputSchema) },
+    contents: message,
+    config: {
+      systemInstruction: classificationSystemPrompt,
+      responseMimeType: "application/json",
+      responseJsonSchema: classificationResponseJsonSchema,
+    },
   });
-  return response.parsed_output;
+  return response.text ? JSON.parse(response.text) : null;
 }
 
 async function main() {
   requireApiKey();
-  const model = process.env.ASSISTANT_MODEL ?? "claude-opus-5";
-  const client = new Anthropic();
+  const model = process.env.ASSISTANT_MODEL ?? "gemini-3.1-flash-lite";
+  const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   const results = [];
   for (const testCase of cases) {

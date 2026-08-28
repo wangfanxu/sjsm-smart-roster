@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { createAnthropicIntentClassifier } from "@/assistant/anthropic-intent-classifier";
+import { GoogleGenAI } from "@google/genai";
+import { createGeminiIntentClassifier } from "@/assistant/gemini-intent-classifier";
 import { AssistantService } from "@/assistant/assistant-service";
 import type { AuthDependencies } from "@/auth/authorize";
 import { getServerAuthDependencies } from "@/auth/server";
@@ -19,9 +19,9 @@ export function getServerApiDependencies(): ApiDependencies {
   if (!apiDependencies) {
     const { db } = getDatabaseConnection();
     const service = new SmartRosterService(createDomainRepository(db));
-    const classifier = createAnthropicIntentClassifier(
-      new Anthropic(),
-      process.env.ASSISTANT_MODEL ?? "claude-opus-5",
+    const classifier = createGeminiIntentClassifier(
+      new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }),
+      process.env.ASSISTANT_MODEL ?? "gemini-3.1-flash-lite",
     );
     apiDependencies = {
       auth: getServerAuthDependencies(),

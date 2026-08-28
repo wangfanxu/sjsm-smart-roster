@@ -1,13 +1,25 @@
-import type Anthropic from "@anthropic-ai/sdk";
+import type { GoogleGenAI } from "@google/genai";
 import { describe, expect, it } from "vitest";
 import {
   classificationOutputSchema,
   classificationSystemPrompt,
-  createAnthropicIntentClassifier,
-} from "./anthropic-intent-classifier";
+  createGeminiIntentClassifier,
+} from "./gemini-intent-classifier";
 
-function fakeClient(parse: () => Promise<{ parsed_output: unknown }>): Anthropic {
-  return { messages: { parse } } as unknown as Anthropic;
+function fakeClient(text: string | undefined): GoogleGenAI {
+  return {
+    models: { generateContent: async () => ({ text }) },
+  } as unknown as GoogleGenAI;
+}
+
+function throwingClient(): GoogleGenAI {
+  return {
+    models: {
+      generateContent: async () => {
+        throw new Error("network error");
+      },
+    },
+  } as unknown as GoogleGenAI;
 }
 
 describe("classification contract", () => {
@@ -34,11 +46,11 @@ describe("classification contract", () => {
   });
 });
 
-describe("createAnthropicIntentClassifier", () => {
+describe("createGeminiIntentClassifier", () => {
   it("maps each allowlisted tool to its assistant intent", async () => {
-    const classifier = createAnthropicIntentClassifier(
-      fakeClient(async () => ({ parsed_output: { tool: "get_my_next_assignment", locale: "en" } })),
-      "claude-opus-5",
+    const classifier = createGeminiIntentClassifier(
+      fakeClient(JSON.stringify({ tool: "get_my_next_assignment", locale: "en" })),
+      "gemini-3.1-flash-lite",
     );
     await expect(classifier.classify("when do I serve next?")).resolves.toEqual({
       intent: "get_my_next_assignment",
@@ -47,17 +59,17 @@ describe("createAnthropicIntentClassifier", () => {
   });
 
   it("maps clarification_needed to an ambiguous intent, preserving locale", async () => {
-    const classifier = createAnthropicIntentClassifier(
-      fakeClient(async () => ({ parsed_output: { tool: "clarification_needed", locale: "zh" } })),
-      "claude-opus-5",
+    const classifier = createGeminiIntentClassifier(
+      fakeClient(JSON.stringify({ tool: "clarification_needed", locale: "zh" })),
+      "gemini-3.1-flash-lite",
     );
     await expect(classifier.classify("嗯？")).resolves.toEqual({ intent: "ambiguous", locale: "zh" });
   });
 
   it("maps unsupported_request to an unsupported intent", async () => {
-    const classifier = createAnthropicIntentClassifier(
-      fakeClient(async () => ({ parsed_output: { tool: "unsupported_request", locale: "en" } })),
-      "claude-opus-5",
+    const classifier = createGeminiIntentClassifier(
+      fakeClient(JSON.stringify({ tool: "unsupported_request", locale: "en" })),
+      "gemini-3.1-flash-lite",
     );
     await expect(classifier.classify("publish the roster")).resolves.toEqual({
       intent: "unsupported",
@@ -65,25 +77,26 @@ describe("createAnthropicIntentClassifier", () => {
     });
   });
 
-  it("falls back to a safe ambiguous English clarification when parsing fails", async () => {
-    const classifier = createAnthropicIntentClassifier(
-      fakeClient(async () => ({ parsed_output: null })),
-      "claude-opus-5",
+  it("falls back to a safe ambiguous English clarification when the response has no text", async () => {
+    const classifier = createGeminiIntentClassifier(fakeClient(undefined), "gemini-3.1-flash-lite");
+    await expect(classifier.classify("???")).resolves.toEqual({ intent: "ambiguous", locale: "en" });
+  });
+
+  it("falls back to a safe ambiguous English clarification when the response is not valid JSON", async () => {
+    const classifier = createGeminiIntentClassifier(fakeClient("not json"), "gemini-3.1-flash-lite");
+    await expect(classifier.classify("???")).resolves.toEqual({ intent: "ambiguous", locale: "en" });
+  });
+
+  it("falls back to a safe ambiguous English clarification when the response fails schema validation", async () => {
+    const classifier = createGeminiIntentClassifier(
+      fakeClient(JSON.stringify({ tool: "delete_everything", locale: "en" })),
+      "gemini-3.1-flash-lite",
     );
     await expect(classifier.classify("???")).resolves.toEqual({ intent: "ambiguous", locale: "en" });
   });
 
   it("falls back to a safe ambiguous English clarification when the API call throws", async () => {
-    const classifier = createAnthropicIntentClassifier(
-      {
-        messages: {
-          parse: async () => {
-            throw new Error("network error");
-          },
-        },
-      } as unknown as Anthropic,
-      "claude-opus-5",
-    );
+    const classifier = createGeminiIntentClassifier(throwingClient(), "gemini-3.1-flash-lite");
     await expect(classifier.classify("anything")).resolves.toEqual({ intent: "ambiguous", locale: "en" });
   });
 });

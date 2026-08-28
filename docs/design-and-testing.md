@@ -93,6 +93,17 @@ Full architecture decision records: [docs/adr/](adr/).
   evidence for the first live release is recorded in
   [deployment.md](deployment.md).
 
+- **[ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md)
+  — Gemini 3.1 Flash-Lite (free tier) for assistant intent classification.**
+  Cheaper than Claude Haiku even on its paid tier, and effectively free for
+  Capstone demo traffic. The provider is isolated behind a one-method
+  `IntentClassifier` interface, so this was a same-day swap from an initial
+  Claude implementation with zero changes to `AssistantService`, the reply
+  templates, or the route. **Important caveat**: the free tier's terms permit
+  Google to use submitted content to improve their models — acceptable for
+  synthetic Capstone demo data, but the ADR explicitly flags that production
+  use with real volunteer messages must move to the paid tier first.
+
 ## 4. Domain model summary
 
 | Area | Tables | Purpose |
@@ -131,15 +142,17 @@ The conversational assistant (US-07) additionally follows the pattern
 a fake/injected classifier (no network, no secret), while a curated
 English/Chinese evaluation dataset (`npm run assistant:eval`) is a separate,
 manually-run script — mirroring `npm run migration:legacy-spike` — because it
-calls the real Anthropic API and must not gate every PR on live model output
-or a committed API key.
+calls the real Gemini API and must not gate every PR on live model output
+or a committed API key. The provider choice (Gemini 3.1 Flash-Lite, free
+tier for the Capstone demo only) and its production caveat are recorded in
+[ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md).
 
 | File | Covers |
 | --- | --- |
 | `src/db/schema.test.ts` | Migration applies cleanly; schema-level constraints (uniqueness, check constraints) behave as designed. |
 | `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, publication, and the assistant endpoint (with a fake classifier). |
 | `src/assistant/assistant-service.test.ts` | Assistant reply logic against a fake classifier and a real `SmartRosterService`: correct EN/ZH templates, no-upcoming-assignment case, clarification/unsupported short-circuit without querying assignments, and that only the authenticated actor's ID is ever used even if the classifier tries to supply one (US-07). |
-| `src/assistant/anthropic-intent-classifier.test.ts` | The classification contract (allowlisted tools, supported locales) and the real classifier's mapping/fallback logic against a fake Anthropic client — no network call. |
+| `src/assistant/gemini-intent-classifier.test.ts` | The classification contract (allowlisted tools, supported locales) and the real classifier's mapping/fallback logic against a fake Gemini client — no network call. |
 | `src/domain/smart-roster-service.test.ts` | Domain service methods (planning periods, services, roles, availability, assignment listing) against a fake `DomainRepository`. |
 | `src/domain/roster-generator.test.ts` | The constraint-based roster generator: hard-constraint enforcement (inactive/unavailable/unqualified volunteers excluded), infeasibility reporting for unfilled roles, soft-constraint scoring (primary-role fit, availability preference, load balance), coverage/fairness measures (US-04), and lock-aware regeneration including infeasible-lock detection (US-05). |
 | `src/auth/firebase-token-verifier.test.ts`, `src/auth/authorize.test.ts`, `src/auth/permissions.test.ts` | Firebase ID-token verification and role-based authorization, including negative/denied cases. |
@@ -193,7 +206,7 @@ suite gives evidence for both.
 | US-04 Review fairness and explanations | Done (#4) | `src/domain/roster-generator.ts` (coverage/fairness metrics), `GET .../candidates`, `GET .../candidates/{candidateId}` |
 | US-05 Lock and regenerate | Done (#5) | `PATCH .../candidates/{candidateId}/assignments/{assignmentId}`, `POST .../candidates/{candidateId}/regenerate`, `regenerateRosterCandidate` in `src/domain/roster-generator.ts` |
 | US-06 Publish a roster | Done (#6) | `POST .../candidates/{candidateId}/publish`, `publishRosterCandidate` in `src/db/domain-repository.ts` |
-| US-07 Ask for my next assignment | Done (#7) | `POST /api/v1/assistant/ask`, `src/assistant/` (service, Anthropic classifier, templates), `npm run assistant:eval` |
+| US-07 Ask for my next assignment | Done (#7) | `POST /api/v1/assistant/ask`, `src/assistant/` (service, Gemini classifier, templates), `npm run assistant:eval` |
 | US-08 Update availability through conversation | Open (#8) | prepare/confirm tool pair, [architecture.md §7](architecture.md#7-ai-tool-boundary) |
 | US-09 Notify assigned volunteers | Open (#9) | `notification_deliveries` (schema already in place) |
 

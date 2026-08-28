@@ -94,14 +94,19 @@ Initial assistant tools:
 The authenticated user ID is injected by the server and is never accepted from model-generated arguments.
 
 `get_my_next_assignment` is implemented as an LLM structured-output classification
-(`src/assistant/anthropic-intent-classifier.ts`) over three allowlisted outcomes —
-the supported tool, `unsupported_request`, or `clarification_needed` — plus
-locale detection (`en`/`zh`). The server executes the actual structured query
+(`src/assistant/gemini-intent-classifier.ts`, Gemini 3.1 Flash-Lite — see
+[ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md))
+over three allowlisted outcomes — the supported tool, `unsupported_request`,
+or `clarification_needed` — plus locale detection (`en`/`zh`). The server
+executes the actual structured query
 (`SmartRosterService.listMyUpcomingAssignments`) and composes the reply from a
 fixed, per-locale template (`src/assistant/reply-templates.ts`); the LLM never
 authors the final user-facing sentence and never supplies a user ID. Any
 classifier failure (parse error, rate limit, network error) degrades to a
-safe `ambiguous` clarification rather than a 500.
+safe `ambiguous` clarification rather than a 500. The provider lives behind
+a small `IntentClassifier` interface (`src/assistant/types.ts`), so swapping
+providers touches only the classifier file, not the service, templates, or
+route.
 
 ## 8. Testing strategy
 

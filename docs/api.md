@@ -258,5 +258,7 @@ output), the endpoint still returns `200` with an `ambiguous` clarification
 rather than an error.
 
 Representative English and Chinese prompts are evaluated with
-`npm run assistant:eval` (requires `ANTHROPIC_API_KEY`; not part of
-`npm test` since it calls the real Anthropic API).
+`npm run assistant:eval` (requires `GEMINI_API_KEY`; not part of
+`npm test` since it calls the real Gemini API). The provider and free-tier
+tradeoffs are recorded in
+[ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md).

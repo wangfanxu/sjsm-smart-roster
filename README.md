@@ -65,10 +65,10 @@ Sprint 1 planning, service, member-role, personal availability, and upcoming-ass
 
 ## Conversational assistant
 
-`POST /api/v1/assistant/ask` answers a volunteer's question about their own next assignment in English or Chinese. It requires `ANTHROPIC_API_KEY` (and optionally `ASSISTANT_MODEL`, default `claude-opus-5`) in the environment; automated tests never call the real API. Evaluate representative English and Chinese prompts against the real model with:
+`POST /api/v1/assistant/ask` answers a volunteer's question about their own next assignment in English or Chinese. It requires `GEMINI_API_KEY` (and optionally `ASSISTANT_MODEL`, default `gemini-3.1-flash-lite`) in the environment; automated tests never call the real API. The free Gemini tier is used for the Capstone demo only — see [ADR 0003](docs/adr/0003-use-gemini-flash-lite-for-assistant-classification.md) before sending real member data through it. Evaluate representative English and Chinese prompts against the real model with:
 
 ```bash
-ANTHROPIC_API_KEY=... npm run assistant:eval
+GEMINI_API_KEY=... npm run assistant:eval
 ```
 
 ## Database
@@ -102,6 +102,7 @@ The synthetic legacy-data spike is reproducible with `npm run migration:legacy-s
 - [Server API](docs/api.md)
 - [Deployment runbook](docs/deployment.md)
 - [Hosting and database ADR](docs/adr/0002-use-firebase-app-hosting-and-neon.md)
+- [Assistant LLM provider ADR](docs/adr/0003-use-gemini-flash-lite-for-assistant-classification.md)
 - [AI coding instructions](AGENTS.md)
 
 ## Core principle

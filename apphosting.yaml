@@ -1,0 +1,18 @@
+# Firebase App Hosting runtime configuration. Secret values live in Cloud Secret Manager.
+runConfig:
+  minInstances: 0
+  maxInstances: 3
+  concurrency: 40
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  - variable: APP_ENV
+    value: production
+    availability:
+      - RUNTIME
+
+  - variable: DATABASE_URL
+    secret: sjsm-smart-roster-database-url
+    availability:
+      - RUNTIME

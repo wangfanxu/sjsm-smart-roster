@@ -15,6 +15,8 @@ function repositoryStub(): DomainRepository {
     upsertAvailability: vi.fn(),
     listUpcomingAssignments: vi.fn(),
     listEligibleUsersForServiceRole: vi.fn(),
+    getRosterGenerationSource: vi.fn(),
+    saveGeneratedCandidate: vi.fn(),
   };
 }
 
@@ -88,5 +90,53 @@ describe("SmartRosterService", () => {
     await expect(service.listMyUpcomingAssignments("current-user")).resolves.toEqual([
       expect.objectContaining({ serviceDate: "2026-09-05", serviceTime: "09:00" }),
     ]);
+  });
+
+  it("stores generated candidates as drafts with the authenticated administrator", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterGenerationSource).mockResolvedValue({
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "service",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drummer", requiredCount: 1 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "volunteer",
+          isActive: true,
+          capabilities: [{ roleId: "drummer", proficiency: "primary" }],
+          availability: {},
+        },
+      ],
+    });
+    vi.mocked(repository.saveGeneratedCandidate).mockResolvedValue({
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "period",
+        version: 1,
+        status: "draft",
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1008.0000",
+        configuration: {},
+        explanation: {},
+      },
+      assignments: [{ id: "assignment", serviceId: "service", roleId: "drummer", userId: "volunteer" }],
+    });
+    const service = new SmartRosterService(repository, now);
+
+    const result = await service.generateCandidate(
+      "period",
+      {},
+      { userId: "administrator" },
+    );
+
+    expect(result.candidate.status).toBe("draft");
+    expect(repository.saveGeneratedCandidate).toHaveBeenCalledWith(
+      expect.objectContaining({ hardConstraintsSatisfied: true }),
+      "administrator",
+    );
   });
 });

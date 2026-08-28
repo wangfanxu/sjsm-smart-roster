@@ -11,6 +11,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `POST` | `/api/v1/planning-periods` | Administrator | Create a planning period |
 | `GET` | `/api/v1/planning-periods/{periodId}/services` | Authenticated | List period services chronologically |
 | `POST` | `/api/v1/planning-periods/{periodId}/services` | Administrator | Create a service and role requirements |
+| `POST` | `/api/v1/planning-periods/{periodId}/candidates` | Administrator | Generate and store a draft roster candidate |
 | `GET` | `/api/v1/roles` | Authenticated | List service-role definitions |
 | `PUT` | `/api/v1/users/{userId}/roles` | Administrator | Replace a member's role capabilities |
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
@@ -26,6 +27,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 - A service requires at least one role, every role must exist, capacities are integers from 1 through 20, and duplicate role requirements are rejected.
 - A member can have each role only once, as either `primary` or `secondary`.
 - Upcoming assignments default to the current instant, are ordered chronologically, and include only the authenticated user and a published candidate roster.
+- Candidate-generation weights are integers from 0 through 100. Omitted weights use the documented defaults.
 
 ## Personal availability example
 
@@ -65,4 +67,22 @@ An empty result returns `assignments: []` and the message `No upcoming assignmen
 
 ## Scheduling boundary
 
-The PostgreSQL repository exposes an eligible-member query that requires an active user, a matching role capability, and no `unavailable` record on the service's Singapore calendar date. The future optimizer must use this query or enforce the equivalent invariant when constructing candidates.
+Candidate generation uses deterministic maximum bipartite matching per service. It excludes inactive, unavailable, and unqualified volunteers and prevents one volunteer from filling multiple roles in the same service. Matching is ordered by configurable primary-role, preferred-availability, and load-balance weights. A generation with missing capacity is still stored as a draft with `hardConstraintsSatisfied: false` and structured `unfilledRoles`; it is never published automatically.
+
+## Candidate generation example
+
+```http
+POST /api/v1/planning-periods/{periodId}/candidates
+Authorization: Bearer <administrator-firebase-id-token>
+Content-Type: application/json
+
+{
+  "weights": {
+    "primaryRole": 10,
+    "preferredAvailability": 5,
+    "loadBalance": 2
+  }
+}
+```
+
+The response contains the stored draft candidate, its generated assignments, and any unfilled required roles. Generation configuration, objective score, structured feasibility explanation, actor, and version are persisted atomically with an audit event.

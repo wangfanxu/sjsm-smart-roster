@@ -10,6 +10,7 @@ import {
   handlePlanningPeriodsPost,
 } from "@/app/api/v1/planning-periods/route";
 import { handleServicesPost } from "@/app/api/v1/planning-periods/[periodId]/services/route";
+import { handleCandidatesPost } from "@/app/api/v1/planning-periods/[periodId]/candidates/route";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -57,6 +58,9 @@ describe("Sprint 1 protected API flow", () => {
       INSERT INTO services (id, planning_period_id, title, starts_at) VALUES
         ('${secondServiceId}', '${periodId}', 'Second Service', '2026-09-12T01:00:00Z'),
         ('${firstServiceId}', '${periodId}', 'First Service', '2026-09-05T01:00:00Z');
+      INSERT INTO service_role_requirements (service_id, role_id, required_count) VALUES
+        ('${firstServiceId}', '${drummerRoleId}', 1),
+        ('${secondServiceId}', '${drummerRoleId}', 1);
       INSERT INTO roster_candidates (
         id, planning_period_id, version, status, hard_constraints_satisfied, created_by
       ) VALUES ('${candidateId}', '${periodId}', 1, 'published', true, '${adminId}');
@@ -221,6 +225,70 @@ describe("Sprint 1 protected API flow", () => {
           endsOn: "2026-12-31",
         }),
       }),
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("generates and audits a draft candidate without publishing it", async () => {
+    const response = await handleCandidatesPost(
+      request(`/api/v1/planning-periods/${periodId}/candidates`, {
+        method: "POST",
+        body: JSON.stringify({
+          weights: { primaryRole: 20, preferredAvailability: 8, loadBalance: 3 },
+        }),
+      }),
+      { params: Promise.resolve({ periodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as {
+      candidate: { id: string; version: number; status: string; hardConstraintsSatisfied: boolean };
+      assignments: Array<{ serviceId: string; userId: string }>;
+      unfilledRoles: unknown[];
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.candidate).toMatchObject({
+      version: 2,
+      status: "draft",
+      hardConstraintsSatisfied: true,
+    });
+    expect(body.assignments).toHaveLength(2);
+    expect(body.unfilledRoles).toEqual([]);
+    expect(body.assignments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ serviceId: firstServiceId, userId: volunteerId }),
+        expect.objectContaining({ serviceId: secondServiceId, userId: otherUserId }),
+      ]),
+    );
+
+    const stored = await pglite.query<{
+      status: string;
+      action: string;
+      actor_user_id: string;
+    }>(`
+      SELECT candidate.status, audit.action, audit.actor_user_id
+      FROM roster_candidates candidate
+      JOIN audit_events audit ON audit.entity_id = candidate.id::text
+      WHERE candidate.id = '${body.candidate.id}'
+    `);
+    expect(stored.rows).toEqual([
+      {
+        status: "draft",
+        action: "roster_candidate.generated",
+        actor_user_id: adminId,
+      },
+    ]);
+  });
+
+  it("denies candidate generation to volunteers", async () => {
+    const response = await handleCandidatesPost(
+      request(`/api/v1/planning-periods/${periodId}/candidates`, {
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+      { params: Promise.resolve({ periodId }) },
       dependencies(),
     );
 

@@ -6,8 +6,13 @@ import type {
   DomainRepository,
   MemberRoleInput,
   PlanningPeriodInput,
+  RosterGenerationRequest,
   ServiceInput,
 } from "./types";
+import {
+  defaultRosterGenerationWeights,
+  generateRosterCandidate,
+} from "./roster-generator";
 
 const applicationTimeZone = "Asia/Singapore";
 
@@ -109,5 +114,32 @@ export class SmartRosterService {
         hour12: false,
       }).format(assignment.startsAt),
     }));
+  }
+
+  async generateCandidate(
+    planningPeriodId: string,
+    input: RosterGenerationRequest,
+    actor: Actor,
+  ) {
+    const source = await this.repository.getRosterGenerationSource(planningPeriodId);
+    if (!source) {
+      throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+    }
+    const totalRequired = source.services.reduce(
+      (total, service) =>
+        total + service.requirements.reduce((sum, requirement) => sum + requirement.requiredCount, 0),
+      0,
+    );
+    if (totalRequired === 0) {
+      throw new ApiError(
+        "no_service_requirements",
+        409,
+        "The planning period has no service role requirements",
+      );
+    }
+    const weights = { ...defaultRosterGenerationWeights, ...input.weights };
+    const generated = generateRosterCandidate(source, weights);
+    const persisted = await this.repository.saveGeneratedCandidate(generated, actor.userId);
+    return { ...persisted, unfilledRoles: generated.unfilledRoles };
   }
 }

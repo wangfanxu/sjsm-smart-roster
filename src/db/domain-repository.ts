@@ -352,7 +352,10 @@ export function createDomainRepository(
               .values(
                 candidate.assignments.map((assignment) => ({
                   candidateId: record.id,
-                  ...assignment,
+                  serviceId: assignment.serviceId,
+                  roleId: assignment.roleId,
+                  userId: assignment.userId,
+                  isLocked: assignment.isLocked ?? false,
                   source: "solver" as const,
                 })),
               )
@@ -361,6 +364,7 @@ export function createDomainRepository(
                 serviceId: assignments.serviceId,
                 roleId: assignments.roleId,
                 userId: assignments.userId,
+                isLocked: assignments.isLocked,
               })
           : [];
         await transaction.insert(auditEvents).values({
@@ -448,6 +452,43 @@ export function createDomainRepository(
         .orderBy(asc(services.startsAt), asc(roles.name), asc(users.displayName));
 
       return { candidate, assignments: assignmentRecords };
+    },
+
+    async setAssignmentLock(
+      candidateId: string,
+      assignmentId: string,
+      isLocked: boolean,
+      actorUserId: string,
+    ) {
+      return database.transaction(async (transaction) => {
+        const [record] = await transaction
+          .select({ id: assignments.id, status: rosterCandidates.status })
+          .from(assignments)
+          .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+          .where(and(eq(assignments.id, assignmentId), eq(assignments.candidateId, candidateId)))
+          .limit(1);
+        if (!record) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+        if (record.status !== "draft") {
+          throw new ApiError(
+            "candidate_not_editable",
+            409,
+            "Only a draft candidate's assignments can be locked or unlocked",
+          );
+        }
+        const [updated] = await transaction
+          .update(assignments)
+          .set({ isLocked, updatedAt: new Date() })
+          .where(eq(assignments.id, assignmentId))
+          .returning({ id: assignments.id, isLocked: assignments.isLocked });
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "assignment.lock_updated",
+          entityType: "assignment",
+          entityId: assignmentId,
+          metadata: { candidateId, isLocked },
+        });
+        return updated;
+      });
     },
   };
 }

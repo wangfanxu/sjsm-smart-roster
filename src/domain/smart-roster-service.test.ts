@@ -19,6 +19,7 @@ function repositoryStub(): DomainRepository {
     saveGeneratedCandidate: vi.fn(),
     listRosterCandidates: vi.fn(),
     getRosterCandidateDetail: vi.fn(),
+    setAssignmentLock: vi.fn(),
   };
 }
 
@@ -175,5 +176,92 @@ describe("SmartRosterService", () => {
     await expect(
       service.getRosterCandidateDetail("period", "candidate"),
     ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
+  });
+
+  it("rejects locking an assignment on a candidate from a different period", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue({
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "other-period",
+        version: 1,
+        status: "draft",
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1000.0000",
+        configuration: {},
+        explanation: {},
+        generatedAt: new Date("2026-08-27T00:00:00Z"),
+      },
+      assignments: [],
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.setAssignmentLock("period", "candidate", "assignment", true, { userId: "administrator" }),
+    ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
+    expect(repository.setAssignmentLock).not.toHaveBeenCalled();
+  });
+
+  it("reports infeasible locks as a structured error without persisting anything", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterGenerationSource).mockResolvedValue({
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "service",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drummer", requiredCount: 1 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "volunteer",
+          isActive: false,
+          capabilities: [{ roleId: "drummer", proficiency: "primary" }],
+          availability: {},
+        },
+      ],
+    });
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue({
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "period",
+        version: 1,
+        status: "draft",
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1000.0000",
+        configuration: {},
+        explanation: {},
+        generatedAt: new Date("2026-08-27T00:00:00Z"),
+      },
+      assignments: [
+        {
+          id: "assignment",
+          serviceId: "service",
+          serviceTitle: "Service",
+          serviceStartsAt: new Date("2026-09-05T01:00:00Z"),
+          roleId: "drummer",
+          roleName: "Drummer",
+          userId: "volunteer",
+          userDisplayName: "Volunteer",
+          isLocked: true,
+          source: "solver",
+        },
+      ],
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.regenerateCandidate("period", "candidate", {}, { userId: "administrator" }),
+    ).rejects.toMatchObject({
+      code: "infeasible_lock",
+      status: 409,
+      details: {
+        infeasibleLocks: [
+          { serviceId: "service", roleId: "drummer", userId: "volunteer", reason: "inactive" },
+        ],
+      },
+    });
+    expect(repository.saveGeneratedCandidate).not.toHaveBeenCalled();
   });
 });

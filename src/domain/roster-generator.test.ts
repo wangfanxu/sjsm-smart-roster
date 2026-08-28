@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultRosterGenerationWeights,
   generateRosterCandidate,
+  regenerateRosterCandidate,
 } from "./roster-generator";
 import type { RosterGenerationSource } from "./types";
 
@@ -193,5 +194,170 @@ describe("generateRosterCandidate", () => {
       meanAssignments: 2,
       spread: 0,
     });
+  });
+});
+
+describe("regenerateRosterCandidate", () => {
+  function regenerate(
+    source: RosterGenerationSource,
+    lockedAssignments: Parameters<typeof regenerateRosterCandidate>[2],
+  ) {
+    return regenerateRosterCandidate(source, defaultRosterGenerationWeights, lockedAssignments);
+  }
+
+  it("keeps a locked assignment unchanged and recalculates only the remaining capacity", () => {
+    const source: RosterGenerationSource = {
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "first",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 2 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "locked-one",
+          isActive: true,
+          capabilities: [{ roleId: "drums", proficiency: "primary" }],
+          availability: {},
+        },
+        {
+          userId: "flexible",
+          isActive: true,
+          capabilities: [{ roleId: "drums", proficiency: "secondary" }],
+          availability: {},
+        },
+      ],
+    };
+
+    const result = regenerate(source, [{ serviceId: "first", roleId: "drums", userId: "locked-one" }]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected regeneration to succeed");
+    expect(result.draft.hardConstraintsSatisfied).toBe(true);
+    expect(result.draft.assignments).toEqual(
+      expect.arrayContaining([
+        { serviceId: "first", roleId: "drums", userId: "locked-one", isLocked: true },
+        { serviceId: "first", roleId: "drums", userId: "flexible" },
+      ]),
+    );
+    expect(result.draft.configuration).toMatchObject({
+      algorithm: "deterministic-bipartite-matching-v1-with-locks",
+    });
+  });
+
+  it("excludes a locked volunteer from other roles in the same service but not from other services", () => {
+    const source: RosterGenerationSource = {
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "first",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [
+            { roleId: "drums", requiredCount: 1 },
+            { roleId: "keys", requiredCount: 1 },
+          ],
+        },
+        {
+          id: "second",
+          startsAt: new Date("2026-09-12T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 1 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "multi",
+          isActive: true,
+          capabilities: [
+            { roleId: "drums", proficiency: "primary" },
+            { roleId: "keys", proficiency: "primary" },
+          ],
+          availability: {},
+        },
+      ],
+    };
+
+    const result = regenerate(source, [{ serviceId: "first", roleId: "drums", userId: "multi" }]);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected regeneration to succeed");
+    expect(result.draft.assignments).toEqual(
+      expect.arrayContaining([
+        { serviceId: "first", roleId: "drums", userId: "multi", isLocked: true },
+        { serviceId: "second", roleId: "drums", userId: "multi" },
+      ]),
+    );
+    expect(result.draft.unfilledRoles).toEqual([
+      {
+        serviceId: "first",
+        roleId: "keys",
+        requiredCount: 1,
+        assignedCount: 0,
+        missingCount: 1,
+      },
+    ]);
+  });
+
+  it("reports an infeasible lock when the volunteer is unavailable on the service date", () => {
+    const source: RosterGenerationSource = {
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "first",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 1 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "now-away",
+          isActive: true,
+          capabilities: [{ roleId: "drums", proficiency: "primary" }],
+          availability: { "2026-09-05": "unavailable" },
+        },
+      ],
+    };
+
+    const result = regenerate(source, [{ serviceId: "first", roleId: "drums", userId: "now-away" }]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected regeneration to report an infeasible lock");
+    expect(result.infeasibleLocks).toEqual([
+      { serviceId: "first", roleId: "drums", userId: "now-away", reason: "unavailable" },
+    ]);
+  });
+
+  it("reports an infeasible lock when the locked count exceeds the current requirement", () => {
+    const source: RosterGenerationSource = {
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "first",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 1 }],
+        },
+      ],
+      volunteers: ["alpha", "bravo"].map((userId) => ({
+        userId,
+        isActive: true,
+        capabilities: [{ roleId: "drums", proficiency: "primary" as const }],
+        availability: {},
+      })),
+    };
+
+    const result = regenerate(source, [
+      { serviceId: "first", roleId: "drums", userId: "alpha" },
+      { serviceId: "first", roleId: "drums", userId: "bravo" },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected regeneration to report an infeasible lock");
+    expect(result.infeasibleLocks).toEqual(
+      expect.arrayContaining([
+        { serviceId: "first", roleId: "drums", userId: "alpha", reason: "requirement_exceeded" },
+        { serviceId: "first", roleId: "drums", userId: "bravo", reason: "requirement_exceeded" },
+      ]),
+    );
   });
 });

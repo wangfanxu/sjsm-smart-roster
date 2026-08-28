@@ -63,6 +63,7 @@ export type GeneratedAssignment = Readonly<{
   serviceId: string;
   roleId: string;
   userId: string;
+  isLocked?: boolean;
 }>;
 
 export type UnfilledRole = Readonly<{
@@ -168,6 +169,12 @@ export interface DomainRepository {
   ): Promise<PersistedCandidate>;
   listRosterCandidates(planningPeriodId: string): Promise<RosterCandidateSummary[]>;
   getRosterCandidateDetail(candidateId: string): Promise<RosterCandidateDetail | null>;
+  setAssignmentLock(
+    candidateId: string,
+    assignmentId: string,
+    isLocked: boolean,
+    actorUserId: string,
+  ): Promise<{ id: string; isLocked: boolean }>;
 }
 
 export type Actor = Pick<AuthenticatedPrincipal, "userId">;

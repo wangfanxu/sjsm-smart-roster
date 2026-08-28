@@ -105,6 +105,12 @@ export const candidateGenerationInput = z
   })
   .strict();
 
+export const assignmentLockInput = z
+  .object({
+    isLocked: z.boolean(),
+  })
+  .strict();
+
 export const uuidParameter = z.uuid();
 
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {

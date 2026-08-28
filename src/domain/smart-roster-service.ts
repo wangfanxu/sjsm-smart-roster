@@ -12,6 +12,7 @@ import type {
 import {
   defaultRosterGenerationWeights,
   generateRosterCandidate,
+  regenerateRosterCandidate,
 } from "./roster-generator";
 
 const applicationTimeZone = "Asia/Singapore";
@@ -155,5 +156,61 @@ export class SmartRosterService {
       throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
     }
     return detail;
+  }
+
+  async setAssignmentLock(
+    planningPeriodId: string,
+    candidateId: string,
+    assignmentId: string,
+    isLocked: boolean,
+    actor: Actor,
+  ) {
+    const detail = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!detail || detail.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+    return this.repository.setAssignmentLock(candidateId, assignmentId, isLocked, actor.userId);
+  }
+
+  async regenerateCandidate(
+    planningPeriodId: string,
+    candidateId: string,
+    input: RosterGenerationRequest,
+    actor: Actor,
+  ) {
+    const source = await this.repository.getRosterGenerationSource(planningPeriodId);
+    if (!source) {
+      throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+    }
+    const previous = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!previous || previous.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+
+    const lockedAssignments = previous.assignments
+      .filter((assignment) => assignment.isLocked)
+      .map((assignment) => ({
+        serviceId: assignment.serviceId,
+        roleId: assignment.roleId,
+        userId: assignment.userId,
+      }));
+
+    const weights = { ...defaultRosterGenerationWeights, ...input.weights };
+    const result = regenerateRosterCandidate(source, weights, lockedAssignments);
+    if (!result.ok) {
+      throw new ApiError(
+        "infeasible_lock",
+        409,
+        "One or more locked assignments are no longer feasible",
+        { infeasibleLocks: result.infeasibleLocks },
+      );
+    }
+
+    const draft = {
+      ...result.draft,
+      configuration: { ...result.draft.configuration, regeneratedFromCandidateId: candidateId },
+    };
+    const persisted = await this.repository.saveGeneratedCandidate(draft, actor.userId);
+    return { ...persisted, unfilledRoles: draft.unfilledRoles };
   }
 }

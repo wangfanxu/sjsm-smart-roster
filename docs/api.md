@@ -14,6 +14,8 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `POST` | `/api/v1/planning-periods/{periodId}/candidates` | Administrator | Generate and store a draft roster candidate |
 | `GET` | `/api/v1/planning-periods/{periodId}/candidates` | Administrator | List roster candidates for a period, newest version first |
 | `GET` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}` | Administrator | Get a roster candidate's score, explanation, and enriched assignments |
+| `PATCH` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/assignments/{assignmentId}` | Administrator | Lock or unlock an assignment on a draft candidate |
+| `POST` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/regenerate` | Administrator | Regenerate a candidate, keeping locked assignments and recalculating the rest |
 | `GET` | `/api/v1/roles` | Authenticated | List service-role definitions |
 | `PUT` | `/api/v1/users/{userId}/roles` | Administrator | Replace a member's role capabilities |
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
@@ -142,3 +144,50 @@ belong to the given period returns `roster_candidate_not_found`.
 assignment output at generation time (never re-derived or rephrased by an
 LLM), satisfying the product rule that no LLM-only reason is treated as
 authoritative.
+
+## Locking assignments and regenerating
+
+`PATCH /api/v1/planning-periods/{periodId}/candidates/{candidateId}/assignments/{assignmentId}`
+sets `isLocked` on one assignment. Only a `draft` candidate's assignments can
+be changed; locking on a `published` or `superseded` candidate returns
+`candidate_not_editable` (409). Every change is audited
+(`assignment.lock_updated`).
+
+```http
+PATCH /api/v1/planning-periods/{periodId}/candidates/{candidateId}/assignments/{assignmentId}
+Authorization: Bearer <administrator-firebase-id-token>
+Content-Type: application/json
+
+{ "isLocked": true }
+```
+
+`POST /api/v1/planning-periods/{periodId}/candidates/{candidateId}/regenerate`
+creates a new candidate version: every assignment currently `isLocked` on the
+given candidate is carried over unchanged, and the solver only recalculates
+the remaining required roles. A locked volunteer is excluded from other
+roles in the same service but remains eligible for other services.
+
+If a lock is no longer feasible against current data — the volunteer became
+inactive, lost the role capability, became unavailable on the service date,
+or the role's required count shrank below the locked count — the endpoint
+returns `409 infeasible_lock` with structured detail instead of silently
+dropping or overriding the lock, and no new candidate version is created:
+
+```json
+{
+  "error": {
+    "code": "infeasible_lock",
+    "message": "One or more locked assignments are no longer feasible",
+    "details": {
+      "infeasibleLocks": [
+        { "serviceId": "...", "roleId": "...", "userId": "...", "reason": "inactive" }
+      ]
+    }
+  }
+}
+```
+
+`reason` is one of `unqualified`, `inactive`, `unavailable`,
+`requirement_exceeded`, or `service_not_found`. The candidate that was
+regenerated from is never modified or deleted, so it remains fully
+auditable alongside the new version.

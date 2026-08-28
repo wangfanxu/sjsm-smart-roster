@@ -12,6 +12,8 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `GET` | `/api/v1/planning-periods/{periodId}/services` | Authenticated | List period services chronologically |
 | `POST` | `/api/v1/planning-periods/{periodId}/services` | Administrator | Create a service and role requirements |
 | `POST` | `/api/v1/planning-periods/{periodId}/candidates` | Administrator | Generate and store a draft roster candidate |
+| `GET` | `/api/v1/planning-periods/{periodId}/candidates` | Administrator | List roster candidates for a period, newest version first |
+| `GET` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}` | Administrator | Get a roster candidate's score, explanation, and enriched assignments |
 | `GET` | `/api/v1/roles` | Authenticated | List service-role definitions |
 | `PUT` | `/api/v1/users/{userId}/roles` | Administrator | Replace a member's role capabilities |
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
@@ -86,3 +88,57 @@ Content-Type: application/json
 ```
 
 The response contains the stored draft candidate, its generated assignments, and any unfilled required roles. Generation configuration, objective score, structured feasibility explanation, actor, and version are persisted atomically with an audit event.
+
+## Reviewing a roster candidate
+
+`GET /api/v1/planning-periods/{periodId}/candidates` returns every stored candidate
+version for the period (`draft`, `published`, or `superseded`), each with its
+`objectiveScore` and full `explanation`, so an administrator can compare
+generations before deciding what to publish.
+
+`GET /api/v1/planning-periods/{periodId}/candidates/{candidateId}` returns one
+candidate's full configuration and explanation together with its assignments,
+each enriched with the service title/date, role name, and volunteer display
+name (not just IDs) so it is directly reviewable. A candidate ID that does not
+belong to the given period returns `roster_candidate_not_found`.
+
+```json
+{
+  "candidate": {
+    "id": "...",
+    "planningPeriodId": "...",
+    "version": 2,
+    "status": "draft",
+    "hardConstraintsSatisfied": true,
+    "objectiveScore": "2018.0000",
+    "configuration": { "algorithm": "deterministic-bipartite-matching-v1", "weights": { "primaryRole": 10, "preferredAvailability": 5, "loadBalance": 2 } },
+    "explanation": {
+      "coverage": { "totalRequired": 2, "totalAssigned": 2, "unfilledCount": 0, "coveragePercentage": 100 },
+      "fairness": { "assignmentCountsByUser": { "...": 1 }, "minAssignments": 1, "maxAssignments": 1, "meanAssignments": 1, "spread": 0 },
+      "primaryAssignments": 2,
+      "preferredAssignments": 0,
+      "unfilledRoles": [],
+      "infeasible": false
+    }
+  },
+  "assignments": [
+    {
+      "id": "...",
+      "serviceId": "...",
+      "serviceTitle": "First Service",
+      "serviceStartsAt": "2026-09-05T01:00:00.000Z",
+      "roleId": "...",
+      "roleName": "Drummer",
+      "userId": "...",
+      "userDisplayName": "Volunteer",
+      "isLocked": false,
+      "source": "solver"
+    }
+  ]
+}
+```
+
+`coverage` and `fairness` are computed directly from the solver's own
+assignment output at generation time (never re-derived or rephrased by an
+LLM), satisfying the product rule that no LLM-only reason is treated as
+authoritative.

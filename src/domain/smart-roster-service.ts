@@ -142,4 +142,18 @@ export class SmartRosterService {
     const persisted = await this.repository.saveGeneratedCandidate(generated, actor.userId);
     return { ...persisted, unfilledRoles: generated.unfilledRoles };
   }
+
+  async listRosterCandidates(planningPeriodId: string) {
+    const period = await this.repository.getPlanningPeriod(planningPeriodId);
+    if (!period) throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+    return this.repository.listRosterCandidates(planningPeriodId);
+  }
+
+  async getRosterCandidateDetail(planningPeriodId: string, candidateId: string) {
+    const detail = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!detail || detail.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+    return detail;
+  }
 }

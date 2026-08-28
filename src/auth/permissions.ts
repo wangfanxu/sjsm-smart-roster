@@ -18,6 +18,7 @@ const administratorPermissions = [
   ...teamLeaderPermissions,
   "planning:manage",
   "roster:generate",
+  "roster:review",
   "roster:publish",
   "user:manage",
   "notification:send",

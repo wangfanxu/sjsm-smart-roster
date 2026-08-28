@@ -10,6 +10,7 @@ export type Permission =
   | "replacement:review"
   | "planning:manage"
   | "roster:generate"
+  | "roster:review"
   | "roster:publish"
   | "user:manage"
   | "notification:send";

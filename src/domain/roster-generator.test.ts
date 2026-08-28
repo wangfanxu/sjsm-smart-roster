@@ -154,4 +154,44 @@ describe("generateRosterCandidate", () => {
 
     expect(new Set(result.assignments.map((assignment) => assignment.userId)).size).toBe(2);
   });
+
+  it("reports coverage and fairness measures grounded in the actual assignments", () => {
+    const result = generate({
+      planningPeriodId: "period",
+      services: [
+        {
+          id: "first",
+          startsAt: new Date("2026-09-05T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 1 }],
+        },
+        {
+          id: "second",
+          startsAt: new Date("2026-09-12T01:00:00Z"),
+          requirements: [{ roleId: "drums", requiredCount: 2 }],
+        },
+      ],
+      volunteers: [
+        {
+          userId: "only-drummer",
+          isActive: true,
+          capabilities: [{ roleId: "drums", proficiency: "primary" }],
+          availability: {},
+        },
+      ],
+    });
+
+    expect(result.explanation.coverage).toEqual({
+      totalRequired: 3,
+      totalAssigned: 2,
+      unfilledCount: 1,
+      coveragePercentage: 66.7,
+    });
+    expect(result.explanation.fairness).toEqual({
+      assignmentCountsByUser: { "only-drummer": 2 },
+      minAssignments: 2,
+      maxAssignments: 2,
+      meanAssignments: 2,
+      spread: 0,
+    });
+  });
 });

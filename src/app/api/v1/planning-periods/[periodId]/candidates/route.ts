@@ -27,6 +27,26 @@ export async function handleCandidatesPost(
   }
 }
 
+export async function handleCandidatesGet(
+  request: Request,
+  context: RouteContext,
+  dependencies: ApiDependencies,
+) {
+  try {
+    await authorizeRequest(request, "roster:review", dependencies.auth);
+    const { periodId: rawPeriodId } = await context.params;
+    const periodId = uuidParameter.parse(rawPeriodId);
+    const candidates = await dependencies.service.listRosterCandidates(periodId);
+    return Response.json({ candidates });
+  } catch (error) {
+    return apiErrorResponse(error);
+  }
+}
+
 export function POST(request: Request, context: RouteContext) {
   return handleCandidatesPost(request, context, getServerApiDependencies());
+}
+
+export function GET(request: Request, context: RouteContext) {
+  return handleCandidatesGet(request, context, getServerApiDependencies());
 }

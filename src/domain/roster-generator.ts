@@ -185,9 +185,28 @@ export function generateRosterCandidate(
     algorithm: "deterministic-bipartite-matching-v1",
     weights,
   };
+  const assignmentCountValues = [...assignmentCounts.values()];
+  const minAssignments = assignmentCountValues.length ? Math.min(...assignmentCountValues) : 0;
+  const maxAssignments = assignmentCountValues.length ? Math.max(...assignmentCountValues) : 0;
+  const meanAssignments = assignmentCountValues.length
+    ? Math.round((assignments.length / assignmentCountValues.length) * 100) / 100
+    : 0;
+  const coveragePercentage =
+    totalRequired === 0 ? 100 : Math.round((assignments.length / totalRequired) * 1000) / 10;
   const explanation = {
-    totalRequired,
-    totalAssigned: assignments.length,
+    coverage: {
+      totalRequired,
+      totalAssigned: assignments.length,
+      unfilledCount: unfilledRoles.length,
+      coveragePercentage,
+    },
+    fairness: {
+      assignmentCountsByUser: Object.fromEntries(assignmentCounts),
+      minAssignments,
+      maxAssignments,
+      meanAssignments,
+      spread: maxAssignments - minAssignments,
+    },
     primaryAssignments,
     preferredAssignments,
     unfilledRoles,

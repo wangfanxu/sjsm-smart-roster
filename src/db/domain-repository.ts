@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type {
   AvailabilityInput,
@@ -390,6 +390,64 @@ export function createDomainRepository(
           assignments: insertedAssignments,
         };
       });
+    },
+
+    async listRosterCandidates(planningPeriodId: string) {
+      return database
+        .select({
+          id: rosterCandidates.id,
+          planningPeriodId: rosterCandidates.planningPeriodId,
+          version: rosterCandidates.version,
+          status: rosterCandidates.status,
+          hardConstraintsSatisfied: rosterCandidates.hardConstraintsSatisfied,
+          objectiveScore: rosterCandidates.objectiveScore,
+          explanation: rosterCandidates.explanation,
+          generatedAt: rosterCandidates.generatedAt,
+        })
+        .from(rosterCandidates)
+        .where(eq(rosterCandidates.planningPeriodId, planningPeriodId))
+        .orderBy(desc(rosterCandidates.version));
+    },
+
+    async getRosterCandidateDetail(candidateId: string) {
+      const [candidate] = await database
+        .select({
+          id: rosterCandidates.id,
+          planningPeriodId: rosterCandidates.planningPeriodId,
+          version: rosterCandidates.version,
+          status: rosterCandidates.status,
+          hardConstraintsSatisfied: rosterCandidates.hardConstraintsSatisfied,
+          objectiveScore: rosterCandidates.objectiveScore,
+          configuration: rosterCandidates.configuration,
+          explanation: rosterCandidates.explanation,
+          generatedAt: rosterCandidates.generatedAt,
+        })
+        .from(rosterCandidates)
+        .where(eq(rosterCandidates.id, candidateId))
+        .limit(1);
+      if (!candidate) return null;
+
+      const assignmentRecords = await database
+        .select({
+          id: assignments.id,
+          serviceId: services.id,
+          serviceTitle: services.title,
+          serviceStartsAt: services.startsAt,
+          roleId: roles.id,
+          roleName: roles.name,
+          userId: users.id,
+          userDisplayName: users.displayName,
+          isLocked: assignments.isLocked,
+          source: assignments.source,
+        })
+        .from(assignments)
+        .innerJoin(services, eq(assignments.serviceId, services.id))
+        .innerJoin(roles, eq(assignments.roleId, roles.id))
+        .innerJoin(users, eq(assignments.userId, users.id))
+        .where(eq(assignments.candidateId, candidateId))
+        .orderBy(asc(services.startsAt), asc(roles.name), asc(users.displayName));
+
+      return { candidate, assignments: assignmentRecords };
     },
   };
 }

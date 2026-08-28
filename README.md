@@ -77,8 +77,14 @@ Tests apply the real migration to a fresh in-memory PostgreSQL instance; they ne
 
 The synthetic legacy-data spike is reproducible with `npm run migration:legacy-spike`. It refuses non-synthetic email domains and writes only aggregate validation evidence. See the [legacy migration spike](docs/legacy-migration-spike.md).
 
+## Project tracking
+
+- [Task board (GitHub Project)](https://github.com/users/wangfanxu/projects/1) — sprint backlog, user stories, and tasks with completion status
+- [Issue tracker](https://github.com/wangfanxu/sjsm-smart-roster/issues) — full history of user stories and tasks delivered
+
 ## Documentation
 
+- [Design and testing document](docs/design-and-testing.md) — architecture and testing decisions in one place, as required for the Capstone submission
 - [Product specification](docs/product-spec.md)
 - [Architecture](docs/architecture.md)
 - [Capstone delivery plan](docs/capstone-plan.md)

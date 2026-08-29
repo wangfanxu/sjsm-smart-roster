@@ -22,6 +22,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
 | `PUT` | `/api/v1/me/availability` | Authenticated self | Upsert personal availability |
 | `GET` | `/api/v1/me/assignments` | Authenticated self | List personal assignments from published rosters |
+| `POST` | `/api/v1/assistant/ask` | Authenticated self | Ask the conversational assistant a supported question |
 
 ## Validation rules
 
@@ -212,3 +213,52 @@ no longer) a draft, and `409 roster_infeasible` if it does not satisfy every
 hard constraint (`hardConstraintsSatisfied: false`). Once published, the
 assigned volunteers' `GET /api/v1/me/assignments` immediately reflects the
 new roster, since that endpoint only ever reads `published` candidates.
+
+## Asking the conversational assistant
+
+`POST /api/v1/assistant/ask` answers a free-text question in English or
+Chinese. Any authenticated user may ask about their own assignments
+(`assignment:read:self`).
+
+```http
+POST /api/v1/assistant/ask
+Authorization: Bearer <firebase-id-token>
+Content-Type: application/json
+
+{ "message": "When do I serve next?" }
+```
+
+```json
+{
+  "intent": "get_my_next_assignment",
+  "locale": "en",
+  "message": "Your next assignment is Worship Service on 2026-09-05 at 09:00 as Drummer.",
+  "assignment": {
+    "assignmentId": "...",
+    "serviceId": "...",
+    "serviceDate": "2026-09-05",
+    "serviceTime": "09:00",
+    "title": "Worship Service",
+    "role": "Drummer"
+  }
+}
+```
+
+The message classifies the request into exactly one allowlisted tool
+(`get_my_next_assignment`) or a safe clarification (`unsupported` or
+`ambiguous`) using structured output from an LLM call — the model never
+supplies a user ID; the authenticated user's ID is always injected by the
+server before the structured query runs. `assignment` is `null` for
+clarification replies or when the volunteer has no upcoming assignment.
+`message` is composed server-side from a fixed English/Chinese template
+filled with the query result, never authored freely by the LLM, so every
+fact in the reply traces back to `GET /api/v1/me/assignments`'s own data
+source. If the LLM call itself fails (timeout, rate limit, malformed
+output), the endpoint still returns `200` with an `ambiguous` clarification
+rather than an error.
+
+Representative English and Chinese prompts are evaluated with
+`npm run assistant:eval` (requires `GEMINI_API_KEY`; not part of
+`npm test` since it calls the real Gemini API). The provider and free-tier
+tradeoffs are recorded in
+[ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md).

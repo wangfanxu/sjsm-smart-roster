@@ -18,6 +18,9 @@ import { handleCandidateDetailGet } from "@/app/api/v1/planning-periods/[periodI
 import { handleAssignmentLockPatch } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/assignments/[assignmentId]/route";
 import { handleCandidateRegeneratePost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/regenerate/route";
 import { handleCandidatePublishPost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/publish/route";
+import { handleAssistantAskPost } from "@/app/api/v1/assistant/ask/route";
+import { AssistantService } from "@/assistant/assistant-service";
+import type { ClassificationResult, IntentClassifier } from "@/assistant/types";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -34,6 +37,10 @@ const periodId = "00000000-0000-4000-a000-000000000005";
 const candidateId = "00000000-0000-4000-a000-000000000006";
 const firstServiceId = "00000000-0000-4000-a000-000000000007";
 const secondServiceId = "00000000-0000-4000-a000-000000000008";
+
+function fakeClassifier(result: ClassificationResult): IntentClassifier {
+  return { classify: async () => result };
+}
 
 function request(path: string, options: RequestInit = {}) {
   const headers = new Headers(options.headers);
@@ -81,17 +88,22 @@ describe("Sprint 1 protected API flow", () => {
     await pglite.close();
   });
 
-  function dependencies(firebaseUid = "firebase-volunteer"): ApiDependencies {
+  function dependencies(
+    firebaseUid = "firebase-volunteer",
+    classification: ClassificationResult = { intent: "ambiguous", locale: "en" },
+  ): ApiDependencies {
     const postgresCompatible = database as unknown as PostgresJsDatabase<typeof schema>;
+    const service = new SmartRosterService(
+      createDomainRepository(postgresCompatible),
+      () => new Date("2026-08-27T04:00:00Z"),
+    );
     return {
       auth: {
         tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
         userRepository: createUserRepository(postgresCompatible),
       },
-      service: new SmartRosterService(
-        createDomainRepository(postgresCompatible),
-        () => new Date("2026-08-27T04:00:00Z"),
-      ),
+      service,
+      assistant: new AssistantService(fakeClassifier(classification), service),
     };
   }
 
@@ -389,6 +401,58 @@ describe("Sprint 1 protected API flow", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("answers the assistant's next-assignment question from a real structured query", async () => {
+    const response = await handleAssistantAskPost(
+      request("/api/v1/assistant/ask", {
+        method: "POST",
+        body: JSON.stringify({ message: "When do I serve next?" }),
+      }),
+      dependencies("firebase-volunteer", { intent: "get_my_next_assignment", locale: "en" }),
+    );
+    const body = (await response.json()) as {
+      intent: string;
+      assignment: { serviceId: string; title: string; role: string } | null;
+      message: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.intent).toBe("get_my_next_assignment");
+    expect(body.assignment).toMatchObject({
+      serviceId: firstServiceId,
+      title: "First Service",
+      role: "Drummer",
+    });
+    expect(body.message).toContain("First Service");
+  });
+
+  it("returns a safe clarification without touching assignment data for an ambiguous question", async () => {
+    const response = await handleAssistantAskPost(
+      request("/api/v1/assistant/ask", {
+        method: "POST",
+        body: JSON.stringify({ message: "???" }),
+      }),
+      dependencies("firebase-volunteer", { intent: "ambiguous", locale: "en" }),
+    );
+    const body = (await response.json()) as { intent: string; assignment: unknown };
+
+    expect(response.status).toBe(200);
+    expect(body.intent).toBe("ambiguous");
+    expect(body.assignment).toBeNull();
+  });
+
+  it("denies an unauthenticated request to ask the assistant", async () => {
+    const response = await handleAssistantAskPost(
+      new Request("https://example.test/api/v1/assistant/ask", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: "When do I serve next?" }),
+      }),
+      dependencies(),
+    );
+
+    expect(response.status).toBe(401);
+  });
 });
 
 describe("Sprint 2 lock and regenerate flow", () => {
@@ -434,15 +498,17 @@ describe("Sprint 2 lock and regenerate flow", () => {
 
   function dependencies(firebaseUid = "firebase-lock-volunteer"): ApiDependencies {
     const postgresCompatible = database as unknown as PostgresJsDatabase<typeof schema>;
+    const service = new SmartRosterService(
+      createDomainRepository(postgresCompatible),
+      () => new Date("2026-08-27T04:00:00Z"),
+    );
     return {
       auth: {
         tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
         userRepository: createUserRepository(postgresCompatible),
       },
-      service: new SmartRosterService(
-        createDomainRepository(postgresCompatible),
-        () => new Date("2026-08-27T04:00:00Z"),
-      ),
+      service,
+      assistant: new AssistantService(fakeClassifier({ intent: "ambiguous", locale: "en" }), service),
     };
   }
 

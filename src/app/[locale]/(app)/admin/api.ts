@@ -4,9 +4,12 @@ import type {
   CandidateSummary,
   GenerateCandidateResult,
   GenerationWeights,
+  MemberUser,
   PlanningPeriod,
+  Proficiency,
   Role,
   Service,
+  SystemRole,
 } from "./types";
 
 export function listPlanningPeriods(idToken: string): Promise<{ planningPeriods: PlanningPeriod[] }> {
@@ -98,6 +101,33 @@ export function regenerateCandidate(
   return apiFetch(`/planning-periods/${periodId}/candidates/${candidateId}/regenerate`, idToken, {
     method: "POST",
     body: JSON.stringify({ weights }),
+  });
+}
+
+export function listUsers(idToken: string): Promise<{ users: MemberUser[] }> {
+  return apiFetch("/users", idToken);
+}
+
+export function createUser(
+  idToken: string,
+  input: Readonly<{ email: string; displayName: string; systemRole: SystemRole }>,
+): Promise<{ user: Readonly<{ id: string; email: string; displayName: string; systemRole: SystemRole }> }> {
+  return apiFetch("/users", idToken, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type MemberRoleCapabilityInput = Readonly<{ roleId: string; proficiency: Proficiency }>;
+
+export function updateMemberRoles(
+  idToken: string,
+  userId: string,
+  capabilities: ReadonlyArray<MemberRoleCapabilityInput>,
+): Promise<{ memberRoles: ReadonlyArray<Readonly<{ userId: string; roleId: string; proficiency: Proficiency }>> }> {
+  return apiFetch(`/users/${userId}/roles`, idToken, {
+    method: "PUT",
+    body: JSON.stringify({ capabilities }),
   });
 }
 

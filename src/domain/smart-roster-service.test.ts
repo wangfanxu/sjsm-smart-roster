@@ -11,6 +11,7 @@ function repositoryStub(): DomainRepository {
     createService: vi.fn(),
     listRoles: vi.fn(),
     createPendingUser: vi.fn(),
+    listUsersWithRoles: vi.fn(),
     replaceMemberRoles: vi.fn(),
     listAvailability: vi.fn(),
     upsertAvailability: vi.fn(),
@@ -293,5 +294,31 @@ describe("SmartRosterService", () => {
       service.publishCandidate("period", "candidate", { userId: "administrator" }),
     ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
     expect(repository.publishRosterCandidate).not.toHaveBeenCalled();
+  });
+
+  it("delegates listing users with their roles to the repository", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.listUsersWithRoles).mockResolvedValue([
+      {
+        id: "user-1",
+        email: "volunteer@example.test",
+        displayName: "Volunteer",
+        systemRole: "volunteer",
+        isActive: true,
+        roles: [{ roleId: "drummer", roleName: "Drummer", proficiency: "primary" }],
+      },
+    ]);
+    const service = new SmartRosterService(repository, now);
+
+    await expect(service.listUsers()).resolves.toEqual([
+      {
+        id: "user-1",
+        email: "volunteer@example.test",
+        displayName: "Volunteer",
+        systemRole: "volunteer",
+        isActive: true,
+        roles: [{ roleId: "drummer", roleName: "Drummer", proficiency: "primary" }],
+      },
+    ]);
   });
 });

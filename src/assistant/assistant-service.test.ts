@@ -15,6 +15,7 @@ function repositoryStub(): DomainRepository {
     createService: vi.fn(),
     listRoles: vi.fn(),
     createPendingUser: vi.fn(),
+    listUsersWithRoles: vi.fn(),
     replaceMemberRoles: vi.fn(),
     listAvailability: vi.fn(),
     upsertAvailability: vi.fn(),

@@ -24,7 +24,7 @@ import type { ClassificationResult, IntentClassifier } from "@/assistant/types";
 import { NotificationService } from "@/notifications/notification-service";
 import type { EmailSender } from "@/notifications/types";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
-import { handleUsersPost } from "@/app/api/v1/users/route";
+import { handleUsersGet, handleUsersPost } from "@/app/api/v1/users/route";
 import { authenticateRequest } from "@/auth/authorize";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -629,6 +629,37 @@ describe("Sprint 1 protected API flow", () => {
 
     expect(response.status).toBe(409);
     expect(body.error.code).toBe("email_already_registered");
+  });
+
+  it("lists every user with their current role capabilities as an administrator", async () => {
+    const response = await handleUsersGet(request("/api/v1/users"), dependencies("firebase-admin"));
+    const body = (await response.json()) as {
+      users: Array<{
+        id: string;
+        email: string;
+        systemRole: string;
+        roles: Array<{ roleId: string; roleName: string; proficiency: string }>;
+      }>;
+    };
+
+    expect(response.status).toBe(200);
+    const volunteer = body.users.find((user) => user.id === volunteerId);
+    const other = body.users.find((user) => user.id === otherUserId);
+    const admin = body.users.find((user) => user.id === adminId);
+
+    expect(volunteer?.roles).toEqual([
+      { roleId: drummerRoleId, roleName: "Drummer", proficiency: "primary" },
+    ]);
+    expect(other?.roles).toEqual([
+      { roleId: drummerRoleId, roleName: "Drummer", proficiency: "secondary" },
+    ]);
+    expect(admin?.roles).toEqual([]);
+  });
+
+  it("denies listing users to non-administrators", async () => {
+    const response = await handleUsersGet(request("/api/v1/users"), dependencies());
+
+    expect(response.status).toBe(403);
   });
 
   it("links a pre-provisioned account on first Google sign-in and applies the assigned role", async () => {

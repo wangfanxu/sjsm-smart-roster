@@ -371,6 +371,12 @@
   margin-top: 8px;
 }
 
+.roleBadgeList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .infeasibleList {
   display: grid;
   gap: 10px;

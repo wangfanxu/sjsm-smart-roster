@@ -88,6 +88,24 @@ Deliverables:
 
 Demo: ask for the next assignment, confirm an unavailability update, regenerate the impacted draft roster, publish, and observe the notification.
 
+### Sprint 4: Frontend (UI-01 through UI-04)
+
+Sprints 1-3 deliberately shipped every user story (#1-#9) as a server API
+with no interactive frontend beyond the Sprint 1 static landing page — a
+choice made explicitly to build the assistant's behavior once against a
+stable API rather than reworking a UI three times as Sprint 3 added more
+intents. With all nine stories complete, Sprint 4 adds the interface
+needed to actually demonstrate them for the Capstone presentation:
+authentication and a role-aware shell (UI-01), the volunteer dashboard
+(UI-02), the assistant chat interface (UI-03), and the administrator
+roster workflow (UI-04). No new backend endpoints are required; every
+screen is a client for an API documented in `docs/api.md`.
+
+Demo: sign in as a volunteer and an administrator, generate and review a
+roster in the UI, lock and regenerate, publish, ask the assistant for a
+next assignment, confirm a conversational availability change, and observe
+the resulting email notification — all without a single manual API call.
+
 ## 4. Initial user stories
 
 ### US-01 View my upcoming assignments

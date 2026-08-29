@@ -5,6 +5,7 @@ import type {
   DateRange,
   DomainRepository,
   MemberRoleInput,
+  PendingUserInput,
   PlanningPeriodInput,
   RosterGenerationRequest,
   ServiceInput,
@@ -77,6 +78,10 @@ export class SmartRosterService {
 
   listRoles() {
     return this.repository.listRoles();
+  }
+
+  createPendingUser(input: PendingUserInput, actor: Actor) {
+    return this.repository.createPendingUser(input, actor.userId);
   }
 
   replaceMemberRoles(userId: string, capabilities: MemberRoleInput, actor: Actor) {

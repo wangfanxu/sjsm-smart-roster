@@ -18,6 +18,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `POST` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/regenerate` | Administrator | Regenerate a candidate, keeping locked assignments and recalculating the rest |
 | `POST` | `/api/v1/planning-periods/{periodId}/candidates/{candidateId}/publish` | Administrator | Publish a draft candidate as the period's official roster |
 | `GET` | `/api/v1/roles` | Authenticated | List service-role definitions |
+| `POST` | `/api/v1/users` | Administrator | Pre-provision a pending user by email, ahead of their first sign-in |
 | `PUT` | `/api/v1/users/{userId}/roles` | Administrator | Replace a member's role capabilities |
 | `GET` | `/api/v1/me/availability` | Authenticated self | Read personal availability |
 | `PUT` | `/api/v1/me/availability` | Authenticated self | Upsert personal availability |
@@ -35,6 +36,29 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 - A member can have each role only once, as either `primary` or `secondary`.
 - Upcoming assignments default to the current instant, are ordered chronologically, and include only the authenticated user and a published candidate roster.
 - Candidate-generation weights are integers from 0 through 100. Omitted weights use the documented defaults.
+
+## Pre-provisioning a user
+
+`POST /api/v1/users` creates a "pending" account — one with no linked
+Firebase identity yet — so an administrator can invite a volunteer before
+they have ever signed in. See
+[Account provisioning](authentication-and-authorization.md#account-provisioning)
+for how the first sign-in links it.
+
+```http
+POST /api/v1/users
+Authorization: Bearer <administrator-firebase-id-token>
+Content-Type: application/json
+
+{
+  "email": "volunteer@example.test",
+  "displayName": "New Volunteer",
+  "systemRole": "volunteer"
+}
+```
+
+Returns `201` with the created user, or `409 email_already_registered` if
+the email is already in use (pending or linked).
 
 ## Personal availability example
 

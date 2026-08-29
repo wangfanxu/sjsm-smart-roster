@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getMessages, isLocale } from "@/i18n/config";
+import { SignInPanel } from "./sign-in-panel";
 
 type HomePageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -40,6 +41,8 @@ export default async function HomePage({ params }: HomePageProps) {
             <p>{messages.principleDescription}</p>
           </div>
         </div>
+
+        <SignInPanel locale={locale} />
       </section>
 
       <section className="status-card" aria-labelledby="foundation-status">

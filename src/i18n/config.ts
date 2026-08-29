@@ -14,6 +14,20 @@ type Messages = {
   foundationTitle: string;
   foundationDescription: string;
   foundationItems: string[];
+  signInCta: string;
+  signInTitle: string;
+  signInDescription: string;
+  signInButton: string;
+  signInLoading: string;
+  signInError: string;
+  notRegisteredTitle: string;
+  notRegisteredDescription: string;
+  signOut: string;
+  navDashboard: string;
+  navAssistant: string;
+  navAdmin: string;
+  loading: string;
+  comingSoon: string;
 };
 
 const messages: Record<Locale, Messages> = {
@@ -37,6 +51,21 @@ const messages: Record<Locale, Messages> = {
       "Automated quality checks",
       "Deployment health endpoint",
     ],
+    signInCta: "Sign in",
+    signInTitle: "Sign in to SmartRoster",
+    signInDescription: "Use your Google account to continue.",
+    signInButton: "Continue with Google",
+    signInLoading: "Signing you in…",
+    signInError: "Sign-in failed. Please try again.",
+    notRegisteredTitle: "Account not yet set up",
+    notRegisteredDescription:
+      "Your Google account isn't linked to a SmartRoster profile yet. Please contact your administrator to be added.",
+    signOut: "Sign out",
+    navDashboard: "My schedule",
+    navAssistant: "Assistant",
+    navAdmin: "Administration",
+    loading: "Loading…",
+    comingSoon: "This screen is coming soon.",
   },
   zh: {
     languageNavigationLabel: "语言选择",
@@ -58,6 +87,20 @@ const messages: Record<Locale, Messages> = {
       "自动化质量检查",
       "部署健康检查",
     ],
+    signInCta: "登录",
+    signInTitle: "登录 SmartRoster",
+    signInDescription: "使用你的 Google 帐号继续。",
+    signInButton: "使用 Google 继续",
+    signInLoading: "正在登录……",
+    signInError: "登录失败，请重试。",
+    notRegisteredTitle: "帐号尚未设置",
+    notRegisteredDescription: "你的 Google 帐号尚未关联 SmartRoster 个人资料，请联系管理员为你添加。",
+    signOut: "登出",
+    navDashboard: "我的排班",
+    navAssistant: "助理",
+    navAdmin: "管理",
+    loading: "加载中……",
+    comingSoon: "此页面即将推出。",
   },
 };
 

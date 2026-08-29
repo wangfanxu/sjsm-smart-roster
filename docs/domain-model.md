@@ -20,6 +20,7 @@ The PostgreSQL model is the authoritative foundation for SmartRoster. TypeScript
 - A published candidate must report that all hard constraints were satisfied.
 - A volunteer can hold only one role in a service within a candidate roster.
 - Notification deliveries use a globally unique idempotency key so retries cannot create duplicate sends.
+- `users.firebase_uid` is nullable and unique: a `NULL` row is a "pending" account an administrator pre-provisioned by email, awaiting the volunteer's first Google sign-in to claim it (see [authentication-and-authorization.md](authentication-and-authorization.md#account-provisioning)).
 - Destructive cascades are limited to owned planning data. User and role references on historical operational records use `RESTRICT` or `SET NULL` to preserve evidence.
 
 ## Timestamps

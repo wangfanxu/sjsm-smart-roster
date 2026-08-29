@@ -52,6 +52,14 @@ export const serviceInput = z.object({
     }),
 });
 
+export const pendingUserInput = z
+  .object({
+    email: z.string().trim().toLowerCase().email().max(255),
+    displayName: z.string().trim().min(1).max(160),
+    systemRole: z.enum(["volunteer", "team_leader", "administrator"]),
+  })
+  .strict();
+
 export const memberRolesInput = z.object({
   capabilities: z
     .array(

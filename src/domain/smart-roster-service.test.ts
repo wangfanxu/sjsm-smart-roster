@@ -10,6 +10,7 @@ function repositoryStub(): DomainRepository {
     getPlanningPeriod: vi.fn(),
     createService: vi.fn(),
     listRoles: vi.fn(),
+    createPendingUser: vi.fn(),
     replaceMemberRoles: vi.fn(),
     listAvailability: vi.fn(),
     upsertAvailability: vi.fn(),

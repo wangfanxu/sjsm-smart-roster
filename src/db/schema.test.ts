@@ -1,25 +1,13 @@
-import { readFile, readdir } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-const migrationDirectory = fileURLToPath(new URL("../../drizzle", import.meta.url));
-
-async function readInitialMigration() {
-  const migrationFiles = (await readdir(migrationDirectory))
-    .filter((file) => file.endsWith(".sql"))
-    .sort();
-
-  expect(migrationFiles).toHaveLength(1);
-  return readFile(`${migrationDirectory}/${migrationFiles[0]}`, "utf8");
-}
+import { readAllMigrationsSql } from "./apply-migrations-for-tests";
 
 describe("initial PostgreSQL migration", () => {
   let database: PGlite;
 
   beforeEach(async () => {
     database = await PGlite.create();
-    await database.exec(await readInitialMigration());
+    await database.exec(await readAllMigrationsSql());
   });
 
   afterEach(async () => {

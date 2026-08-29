@@ -56,7 +56,17 @@ These steps change cloud resources and may enable billing. Perform them from the
    confirmation tokens for conversational availability writes, not an
    external credential. `ASSISTANT_MODEL` is not sensitive and is set as a
    plain value in `apphosting.yaml`.
-9. Trigger or wait for the `main` rollout. Record the URL, commit SHA, rollout result, and verification output in the deployment evidence section below.
+9. Add the email notification secret the same way:
+
+   ```bash
+   firebase apphosting:secrets:set sjsm-smart-roster-resend-api-key
+   ```
+
+   Use a Resend API key. `NOTIFICATION_FROM_EMAIL` is not sensitive and is
+   set as a plain value in `apphosting.yaml`; it must be a verified sending
+   domain/address in the Resend account, or sends will fail (recorded as
+   `failed` rows in `notification_deliveries`, never blocking publication).
+10. Trigger or wait for the `main` rollout. Record the URL, commit SHA, rollout result, and verification output in the deployment evidence section below.
 
 Firebase App Hosting automatically supplies Firebase project configuration and Google Application Default Credentials. Do not create or upload a service-account key for the application.
 

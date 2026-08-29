@@ -127,7 +127,43 @@ database row or server-side session backs a pending confirmation: if the
 volunteer never calls `/confirm`, nothing happens and there is nothing to
 clean up.
 
-## 8. Testing strategy
+## 8. Notification delivery
+
+Publishing a roster (`POST .../candidates/{candidateId}/publish`) triggers
+`NotificationService.notifyRosterPublished` — implemented (US-09) — after
+the publish transaction has already committed, never inside it. This
+ordering is what makes the two hard requirements possible at once:
+
+- **A delivery failure can never roll back a valid published roster.** The
+  publish route wraps the notify call in its own `try`/`catch`; any error
+  is logged, never re-thrown, so the HTTP response still reflects a
+  successful publish regardless of email outcome.
+- **Notifications are only generated after a successful publication.**
+  There is no code path that creates a `notification_deliveries` row
+  before `publishRosterCandidate` has returned.
+
+For every distinct volunteer assigned in the published candidate, one
+digest email (listing every assignment they received in that roster) is
+created with a deterministic idempotency key,
+`roster_published:{candidateId}:{userId}`, which is the unique key already
+enforced by the `notification_deliveries` schema. `getOrCreateNotifications`
+inserts new rows with `ON CONFLICT (idempotency_key) DO NOTHING` and then
+selects every matching row that is not yet `sent` — so calling it again for
+the same candidate (a retry after a crash, or an operator re-running it)
+never creates a duplicate row and never re-sends anything already
+delivered, while still retrying anything left `pending` or `failed`. Each
+send is attempted independently; one recipient's failure is recorded
+(`status: failed`, `lastError`) without affecting any other recipient's
+send in the same batch.
+
+The actual provider (`src/notifications/resend-email-sender.ts`, Resend) is
+reached only through the `EmailSender` interface
+(`src/notifications/types.ts`) — one method, `send`. `NotificationService`
+depends on that interface, not on Resend, so the provider is replaceable
+without touching notification logic, mirroring how `IntentClassifier`
+isolates the assistant's LLM provider (§7).
+
+## 9. Testing strategy
 
 - Unit tests for domain rules, scoring, authorization, and parameter validation.
 - Property-based or generated tests for scheduling invariants.
@@ -136,7 +172,7 @@ clean up.
 - End-to-end tests for roster generation, publication, personal queries, and confirmed availability updates.
 - Evaluation dataset for conversational intents, including ambiguous and unauthorized requests.
 
-## 9. Migration strategy
+## 10. Migration strategy
 
 1. Capture the legacy data shape and create anonymized fixtures.
 2. Build the new schema and one-time migration script.

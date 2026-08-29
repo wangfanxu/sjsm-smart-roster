@@ -31,3 +31,13 @@ env:
     secret: sjsm-smart-roster-assistant-confirmation-secret
     availability:
       - RUNTIME
+
+  - variable: NOTIFICATION_FROM_EMAIL
+    value: notifications@sjsm-smart-roster.app
+    availability:
+      - RUNTIME
+
+  - variable: RESEND_API_KEY
+    secret: sjsm-smart-roster-resend-api-key
+    availability:
+      - RUNTIME

@@ -215,6 +215,15 @@ hard constraint (`hardConstraintsSatisfied: false`). Once published, the
 assigned volunteers' `GET /api/v1/me/assignments` immediately reflects the
 new roster, since that endpoint only ever reads `published` candidates.
 
+After a successful publish, one email notification is generated per
+distinct assigned volunteer (see
+[Notification delivery](architecture.md#8-notification-delivery)). Sending
+is best-effort and happens after the publish transaction has already
+committed: a delivery failure is recorded in `notification_deliveries`
+(`status: failed`, `lastError`) but never changes the publish response or
+the candidate's status. The publish response body is unaffected by
+notification outcomes either way.
+
 ## Asking the conversational assistant
 
 `POST /api/v1/assistant/ask` answers a free-text question in English or

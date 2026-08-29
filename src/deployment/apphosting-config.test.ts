@@ -30,4 +30,12 @@ describe("Firebase App Hosting configuration", () => {
     expect(config).not.toMatch(/GEMINI_API_KEY:\s*\S+/);
     expect(config).not.toMatch(/ASSISTANT_CONFIRMATION_SECRET:\s*\S+/);
   });
+
+  it("references the Resend API key as a runtime secret", async () => {
+    const config = await readFile(configPath, "utf8");
+
+    expect(config).toContain("variable: RESEND_API_KEY");
+    expect(config).toContain("secret: sjsm-smart-roster-resend-api-key");
+    expect(config).not.toMatch(/RESEND_API_KEY:\s*\S+/);
+  });
 });

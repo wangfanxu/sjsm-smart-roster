@@ -71,6 +71,10 @@ Sprint 1 planning, service, member-role, personal availability, and upcoming-ass
 GEMINI_API_KEY=... npm run assistant:eval
 ```
 
+## Email notifications
+
+Publishing a roster sends one digest email per assigned volunteer (`src/notifications/`). Delivery status is recorded in `notification_deliveries`; a send failure is logged there and never affects the publish response or the candidate's status. Requires `RESEND_API_KEY` and `NOTIFICATION_FROM_EMAIL` in the environment; automated tests never call the real API.
+
 ## Database
 
 The server domain uses PostgreSQL with Drizzle ORM. Copy `.env.example` to `.env.local`, set `DATABASE_URL`, then use the version-controlled migration workflow:

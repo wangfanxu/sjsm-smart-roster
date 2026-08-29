@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { handleAvailabilityGet, handleAvailabilityPut } from "@/app/api/v1/me/availability/route";
 import { handleAssistantConfirmPost } from "@/app/api/v1/assistant/confirm/route";
 import { handleAssignmentsGet } from "@/app/api/v1/me/assignments/route";
@@ -22,6 +22,8 @@ import { handleCandidatePublishPost } from "@/app/api/v1/planning-periods/[perio
 import { handleAssistantAskPost } from "@/app/api/v1/assistant/ask/route";
 import { AssistantService } from "@/assistant/assistant-service";
 import type { ClassificationResult, IntentClassifier } from "@/assistant/types";
+import { NotificationService } from "@/notifications/notification-service";
+import type { EmailSender } from "@/notifications/types";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -41,6 +43,10 @@ const secondServiceId = "00000000-0000-4000-a000-000000000008";
 
 function fakeClassifier(result: ClassificationResult): IntentClassifier {
   return { classify: async () => result };
+}
+
+function fakeEmailSender(): EmailSender {
+  return { send: vi.fn().mockResolvedValue({ providerMessageId: "fake-message-id" }) };
 }
 
 function request(path: string, options: RequestInit = {}) {
@@ -92,12 +98,11 @@ describe("Sprint 1 protected API flow", () => {
   function dependencies(
     firebaseUid = "firebase-volunteer",
     classification: ClassificationResult = { intent: "ambiguous", locale: "en" },
+    emailSender: EmailSender = fakeEmailSender(),
   ): ApiDependencies {
     const postgresCompatible = database as unknown as PostgresJsDatabase<typeof schema>;
-    const service = new SmartRosterService(
-      createDomainRepository(postgresCompatible),
-      () => new Date("2026-08-27T04:00:00Z"),
-    );
+    const repository = createDomainRepository(postgresCompatible);
+    const service = new SmartRosterService(repository, () => new Date("2026-08-27T04:00:00Z"));
     return {
       auth: {
         tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
@@ -110,6 +115,7 @@ describe("Sprint 1 protected API flow", () => {
         "test-secret",
         () => new Date("2026-08-27T04:00:00Z"),
       ),
+      notifications: new NotificationService(repository, emailSender),
     };
   }
 
@@ -610,12 +616,13 @@ describe("Sprint 2 lock and regenerate flow", () => {
     await pglite.close();
   });
 
-  function dependencies(firebaseUid = "firebase-lock-volunteer"): ApiDependencies {
+  function dependencies(
+    firebaseUid = "firebase-lock-volunteer",
+    emailSender: EmailSender = fakeEmailSender(),
+  ): ApiDependencies {
     const postgresCompatible = database as unknown as PostgresJsDatabase<typeof schema>;
-    const service = new SmartRosterService(
-      createDomainRepository(postgresCompatible),
-      () => new Date("2026-08-27T04:00:00Z"),
-    );
+    const repository = createDomainRepository(postgresCompatible);
+    const service = new SmartRosterService(repository, () => new Date("2026-08-27T04:00:00Z"));
     return {
       auth: {
         tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
@@ -628,6 +635,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
         "test-secret",
         () => new Date("2026-08-27T04:00:00Z"),
       ),
+      notifications: new NotificationService(repository, emailSender),
     };
   }
 
@@ -929,6 +937,88 @@ describe("Sprint 2 lock and regenerate flow", () => {
     expect(body.error.code).toBe("candidate_not_publishable");
   });
 
+  it("sends a roster-published notification to each assigned volunteer after publish", async () => {
+    const emailSender = fakeEmailSender();
+    const draft = await generateDraft();
+
+    const response = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin", emailSender),
+    );
+    expect(response.status).toBe(200);
+
+    const distinctUserIds = new Set(draft.assignments.map((assignment) => assignment.userId));
+    expect(emailSender.send).toHaveBeenCalledTimes(distinctUserIds.size);
+
+    const rows = await pglite.query<{
+      user_id: string;
+      status: string;
+      idempotency_key: string;
+      provider_message_id: string;
+    }>(`
+      SELECT user_id, status, idempotency_key, provider_message_id FROM notification_deliveries
+      WHERE idempotency_key LIKE 'roster_published:${draft.candidate.id}:%'
+    `);
+    expect(rows.rows).toHaveLength(distinctUserIds.size);
+    for (const row of rows.rows) {
+      expect(row.status).toBe("sent");
+      expect(row.idempotency_key).toBe(`roster_published:${draft.candidate.id}:${row.user_id}`);
+      expect(row.provider_message_id).toBe("fake-message-id");
+    }
+  });
+
+  it("does not resend a notification already marked sent when notified again for the same candidate", async () => {
+    const emailSender = fakeEmailSender();
+    const draft = await generateDraft();
+    const deps = dependencies("firebase-lock-admin", emailSender);
+    await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      deps,
+    );
+    const distinctUserIds = new Set(draft.assignments.map((assignment) => assignment.userId));
+    expect(emailSender.send).toHaveBeenCalledTimes(distinctUserIds.size);
+
+    await deps.notifications.notifyRosterPublished(draft.candidate.id);
+
+    expect(emailSender.send).toHaveBeenCalledTimes(distinctUserIds.size);
+  });
+
+  it("records a failed notification without affecting the published candidate", async () => {
+    const emailSender: EmailSender = { send: vi.fn().mockRejectedValue(new Error("provider outage")) };
+    const draft = await generateDraft();
+
+    const response = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin", emailSender),
+    );
+    const body = (await response.json()) as { candidate: { status: string } };
+    expect(response.status).toBe(200);
+    expect(body.candidate.status).toBe("published");
+
+    const candidateStatus = await pglite.query<{ status: string }>(`
+      SELECT status FROM roster_candidates WHERE id = '${draft.candidate.id}'
+    `);
+    expect(candidateStatus.rows[0].status).toBe("published");
+
+    const notificationRows = await pglite.query<{ status: string; last_error: string }>(`
+      SELECT status, last_error FROM notification_deliveries
+      WHERE idempotency_key LIKE 'roster_published:${draft.candidate.id}:%'
+    `);
+    expect(notificationRows.rows.length).toBeGreaterThan(0);
+    for (const row of notificationRows.rows) {
+      expect(row.status).toBe("failed");
+      expect(row.last_error).toBe("provider outage");
+    }
+  });
   it("rejects publishing a candidate that does not satisfy hard constraints", async () => {
     const unfillableRoleId = "00000000-0000-4000-a000-000000000109";
     const unfillableServiceId = "00000000-0000-4000-a000-000000000110";
@@ -955,4 +1045,5 @@ describe("Sprint 2 lock and regenerate flow", () => {
     expect(response.status).toBe(409);
     expect(body.error.code).toBe("roster_infeasible");
   });
+
 });

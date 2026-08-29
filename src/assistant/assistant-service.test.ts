@@ -4,6 +4,8 @@ import type { DomainRepository } from "@/domain/types";
 import { AssistantService } from "./assistant-service";
 import type { ClassificationResult, IntentClassifier } from "./types";
 
+const secret = "test-secret";
+
 function repositoryStub(): DomainRepository {
   return {
     listPlanningPeriods: vi.fn(),
@@ -48,6 +50,8 @@ describe("AssistantService", () => {
     const assistant = new AssistantService(
       fakeClassifier({ intent: "get_my_next_assignment", locale: "en" }),
       rosterService,
+      secret,
+      now,
     );
 
     const reply = await assistant.ask("When do I serve next?", { userId: "volunteer-1" });
@@ -61,6 +65,7 @@ describe("AssistantService", () => {
       role: "Drummer",
     });
     expect(reply.message).toContain("Worship");
+    expect(reply.confirmationToken).toBeNull();
     expect(repository.listUpcomingAssignments).toHaveBeenCalledWith("volunteer-1", now(), undefined);
   });
 
@@ -71,6 +76,8 @@ describe("AssistantService", () => {
     const assistant = new AssistantService(
       fakeClassifier({ intent: "get_my_next_assignment", locale: "en" }),
       rosterService,
+      secret,
+      now,
     );
 
     const reply = await assistant.ask("next assignment?", { userId: "volunteer-1" });
@@ -85,6 +92,8 @@ describe("AssistantService", () => {
     const assistant = new AssistantService(
       fakeClassifier({ intent: "ambiguous", locale: "zh" }),
       rosterService,
+      secret,
+      now,
     );
 
     const reply = await assistant.ask("嗯？", { userId: "volunteer-1" });
@@ -101,6 +110,8 @@ describe("AssistantService", () => {
     const assistant = new AssistantService(
       fakeClassifier({ intent: "unsupported", locale: "en" }),
       rosterService,
+      secret,
+      now,
     );
 
     const reply = await assistant.ask("Please publish the roster for me", { userId: "volunteer-1" });
@@ -119,10 +130,141 @@ describe("AssistantService", () => {
         .fn()
         .mockResolvedValue({ intent: "get_my_next_assignment", locale: "en", userId: "attacker-id" }),
     };
-    const assistant = new AssistantService(maliciousClassifier, rosterService);
+    const assistant = new AssistantService(maliciousClassifier, rosterService, secret, now);
 
     await assistant.ask("when do I serve next?", { userId: "real-authenticated-user" });
 
-    expect(repository.listUpcomingAssignments).toHaveBeenCalledWith("real-authenticated-user", now(), undefined);
+    expect(repository.listUpcomingAssignments).toHaveBeenCalledWith(
+      "real-authenticated-user",
+      now(),
+      undefined,
+    );
+  });
+
+  it("prepares a mark-unavailable confirmation without writing anything", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-09-10" }),
+      rosterService,
+      secret,
+      now,
+    );
+
+    const reply = await assistant.ask("I can't serve on September 10", { userId: "volunteer-1" });
+
+    expect(reply.intent).toBe("prepare_mark_unavailable");
+    expect(reply.pendingServiceDate).toBe("2026-09-10");
+    expect(reply.confirmationToken).toEqual(expect.any(String));
+    expect(reply.message).toContain("2026-09-10");
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
+  });
+
+  it("asks for clarification when the date could not be resolved, issuing no token", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: null }),
+      rosterService,
+      secret,
+      now,
+    );
+
+    const reply = await assistant.ask("I can't serve sometime", { userId: "volunteer-1" });
+
+    expect(reply.intent).toBe("ambiguous");
+    expect(reply.confirmationToken).toBeNull();
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
+  });
+
+  it("confirms a prepared mark-unavailable request and writes availability", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.upsertAvailability).mockResolvedValue({ status: "unavailable" });
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-09-10" }),
+      rosterService,
+      secret,
+      now,
+    );
+    const prepared = await assistant.ask("I can't serve on September 10", { userId: "volunteer-1" });
+
+    const confirmation = await assistant.confirm(prepared.confirmationToken!, { userId: "volunteer-1" });
+
+    expect(confirmation.serviceDate).toBe("2026-09-10");
+    expect(confirmation.message).toContain("2026-09-10");
+    expect(repository.upsertAvailability).toHaveBeenCalledWith(
+      "volunteer-1",
+      { serviceDate: "2026-09-10", status: "unavailable" },
+      "volunteer-1",
+    );
+  });
+
+  it("never writes anything if the user simply does not confirm (cancel)", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-09-10" }),
+      rosterService,
+      secret,
+      now,
+    );
+
+    await assistant.ask("I can't serve on September 10", { userId: "volunteer-1" });
+
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
+  });
+
+  it("rejects confirmation from a different user than the one who requested it", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-09-10" }),
+      rosterService,
+      secret,
+      now,
+    );
+    const prepared = await assistant.ask("I can't serve on September 10", { userId: "volunteer-1" });
+
+    await expect(
+      assistant.confirm(prepared.confirmationToken!, { userId: "attacker" }),
+    ).rejects.toMatchObject({ code: "confirmation_user_mismatch", status: 403 });
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
+  });
+
+  it("rejects a tampered confirmation token", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-09-10" }),
+      rosterService,
+      secret,
+      now,
+    );
+    const prepared = await assistant.ask("I can't serve on September 10", { userId: "volunteer-1" });
+    const tampered = `${prepared.confirmationToken!.slice(0, -1)}x`;
+
+    await expect(assistant.confirm(tampered, { userId: "volunteer-1" })).rejects.toMatchObject({
+      code: "confirmation_expired",
+      status: 409,
+    });
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
+  });
+
+  it("rechecks date validity at confirm time even though prepare accepted it", async () => {
+    const repository = repositoryStub();
+    const rosterService = new SmartRosterService(repository, now);
+    const assistant = new AssistantService(
+      fakeClassifier({ intent: "prepare_mark_unavailable", locale: "en", serviceDate: "2026-08-01" }),
+      rosterService,
+      secret,
+      now,
+    );
+    const prepared = await assistant.ask("I couldn't serve on August 1", { userId: "volunteer-1" });
+
+    await expect(
+      assistant.confirm(prepared.confirmationToken!, { userId: "volunteer-1" }),
+    ).rejects.toMatchObject({ code: "past_availability_date", status: 400 });
+    expect(repository.upsertAvailability).not.toHaveBeenCalled();
   });
 });

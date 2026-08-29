@@ -23,6 +23,7 @@ All versioned endpoints use JSON and live under `/api/v1`. Protected requests se
 | `PUT` | `/api/v1/me/availability` | Authenticated self | Upsert personal availability |
 | `GET` | `/api/v1/me/assignments` | Authenticated self | List personal assignments from published rosters |
 | `POST` | `/api/v1/assistant/ask` | Authenticated self | Ask the conversational assistant a supported question |
+| `POST` | `/api/v1/assistant/confirm` | Authenticated self | Execute a previously prepared conversational availability write |
 
 ## Validation rules
 
@@ -245,19 +246,87 @@ Content-Type: application/json
 ```
 
 The message classifies the request into exactly one allowlisted tool
-(`get_my_next_assignment`) or a safe clarification (`unsupported` or
-`ambiguous`) using structured output from an LLM call — the model never
-supplies a user ID; the authenticated user's ID is always injected by the
-server before the structured query runs. `assignment` is `null` for
-clarification replies or when the volunteer has no upcoming assignment.
-`message` is composed server-side from a fixed English/Chinese template
-filled with the query result, never authored freely by the LLM, so every
-fact in the reply traces back to `GET /api/v1/me/assignments`'s own data
-source. If the LLM call itself fails (timeout, rate limit, malformed
-output), the endpoint still returns `200` with an `ambiguous` clarification
-rather than an error.
+(`get_my_next_assignment`, `prepare_mark_unavailable`) or a safe
+clarification (`unsupported` or `ambiguous`) using structured output from an
+LLM call — the model never supplies a user ID; the authenticated user's ID
+is always injected by the server before any structured query or write runs.
+`assignment` is `null` for clarification replies, prepare replies, or when
+the volunteer has no upcoming assignment. `message` is composed server-side
+from a fixed English/Chinese template filled with the query result, never
+authored freely by the LLM, so every fact in the reply traces back to real
+data. If the LLM call itself fails (timeout, rate limit, malformed output),
+the endpoint still returns `200` with an `ambiguous` clarification rather
+than an error.
 
-Representative English and Chinese prompts are evaluated with
+## Updating availability through conversation (prepare/confirm)
+
+Read-only questions (`get_my_next_assignment`) execute immediately. Marking
+yourself unavailable is a write, so it never happens from `/assistant/ask`
+alone — it requires an explicit second call to `/assistant/confirm`.
+
+```http
+POST /api/v1/assistant/ask
+Authorization: Bearer <firebase-id-token>
+Content-Type: application/json
+
+{ "message": "I can't serve on September 20" }
+```
+
+```json
+{
+  "intent": "prepare_mark_unavailable",
+  "locale": "en",
+  "message": "You want to mark yourself unavailable on 2026-09-20. Reply to confirm, or ignore this to cancel.",
+  "assignment": null,
+  "confirmationToken": "<opaque, signed, short-lived token>",
+  "pendingServiceDate": "2026-09-20"
+}
+```
+
+The LLM resolves any relative date expression ("tomorrow", "next Sunday",
+"9月5日") against the current Singapore calendar date and returns an
+absolute `YYYY-MM-DD`; if it cannot confidently resolve one specific date,
+the reply is instead an `ambiguous` clarification and no token is issued.
+
+Nothing is written yet. The date and action are shown back to the user (per
+the `message` and `pendingServiceDate` above) before anything happens.
+**The user cancels simply by not confirming** — there is no server-side
+state to clean up, since the token is a self-contained, HMAC-signed,
+5-minute-lived credential, not a database row.
+
+To execute the write, the same user calls:
+
+```http
+POST /api/v1/assistant/confirm
+Authorization: Bearer <firebase-id-token>
+Content-Type: application/json
+
+{ "confirmationToken": "<token from the prepare reply>" }
+```
+
+```json
+{
+  "locale": "en",
+  "message": "Done — you're marked unavailable on 2026-09-20.",
+  "serviceDate": "2026-09-20"
+}
+```
+
+`confirm` re-authenticates and re-authorizes the request independently (it
+does not trust anything about who was logged in when the token was issued),
+and rejects with `403 confirmation_user_mismatch` if the token belongs to a
+different user. It then performs the write through the same validated path
+as `PUT /api/v1/me/availability`
+(`SmartRosterService.setMyAvailability`), which re-checks that the date is
+not in the past **at confirmation time** — a token minted for a
+same-day-or-future date can still be rejected with `400
+past_availability_date` if enough time passed before it was confirmed.
+`409 confirmation_expired` covers an invalid, tampered, or expired token
+(the same code is used for all three, so a client cannot distinguish
+forgery attempts from ordinary expiry).
+
+Representative English and Chinese prompts — including relative-date
+expressions like "tomorrow" and "下周日" — are evaluated with
 `npm run assistant:eval` (requires `GEMINI_API_KEY`; not part of
 `npm test` since it calls the real Gemini API). The provider and free-tier
 tradeoffs are recorded in

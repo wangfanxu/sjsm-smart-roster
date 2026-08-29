@@ -65,7 +65,7 @@ Sprint 1 planning, service, member-role, personal availability, and upcoming-ass
 
 ## Conversational assistant
 
-`POST /api/v1/assistant/ask` answers a volunteer's question about their own next assignment in English or Chinese. It requires `GEMINI_API_KEY` (and optionally `ASSISTANT_MODEL`, default `gemini-3.1-flash-lite`) in the environment; automated tests never call the real API. The free Gemini tier is used for the Capstone demo only — see [ADR 0003](docs/adr/0003-use-gemini-flash-lite-for-assistant-classification.md) before sending real member data through it. Evaluate representative English and Chinese prompts against the real model with:
+`POST /api/v1/assistant/ask` answers a volunteer's question about their own next assignment, or prepares a conversational "mark me unavailable" request, in English or Chinese. `POST /api/v1/assistant/confirm` executes a prepared availability write — nothing is written until the volunteer explicitly confirms. It requires `GEMINI_API_KEY` (and optionally `ASSISTANT_MODEL`, default `gemini-3.1-flash-lite`) and `ASSISTANT_CONFIRMATION_SECRET` (signs confirmation tokens) in the environment; automated tests never call the real API. The free Gemini tier is used for the Capstone demo only — see [ADR 0003](docs/adr/0003-use-gemini-flash-lite-for-assistant-classification.md) before sending real member data through it. Evaluate representative English and Chinese prompts, including relative-date resolution, against the real model with:
 
 ```bash
 GEMINI_API_KEY=... npm run assistant:eval

@@ -4,7 +4,7 @@ import { ZodError } from "zod";
 export class ApiError extends Error {
   constructor(
     public readonly code: string,
-    public readonly status: 400 | 404 | 409,
+    public readonly status: 400 | 403 | 404 | 409,
     message: string,
     public readonly details?: unknown,
   ) {

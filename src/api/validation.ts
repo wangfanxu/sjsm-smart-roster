@@ -52,6 +52,20 @@ export const serviceInput = z.object({
     }),
 });
 
+export const createRoleInput = z
+  .object({
+    slug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .min(1)
+      .max(60)
+      .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "Slug must be lowercase kebab-case"),
+    name: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+
 export const pendingUserInput = z
   .object({
     email: z.string().trim().toLowerCase().email().max(255),

@@ -9,3 +9,6 @@ build/
 *.log
 *.tsbuildinfo
 .DS_Store
+
+# Real member exports contain personal data and must never be committed.
+legacy-members-export*.json

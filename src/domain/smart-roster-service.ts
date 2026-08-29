@@ -2,6 +2,7 @@ import { ApiError } from "@/api/errors";
 import type {
   Actor,
   AvailabilityInput,
+  CreateRoleInput,
   DateRange,
   DomainRepository,
   MemberRoleInput,
@@ -78,6 +79,10 @@ export class SmartRosterService {
 
   listRoles() {
     return this.repository.listRoles();
+  }
+
+  createRole(input: CreateRoleInput, actor: Actor) {
+    return this.repository.createRole(input, actor.userId);
   }
 
   createPendingUser(input: PendingUserInput, actor: Actor) {

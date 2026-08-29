@@ -25,6 +25,7 @@ import { NotificationService } from "@/notifications/notification-service";
 import type { EmailSender } from "@/notifications/types";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
 import { handleUsersGet, handleUsersPost } from "@/app/api/v1/users/route";
+import { handleRolesPost } from "@/app/api/v1/roles/route";
 import { authenticateRequest } from "@/auth/authorize";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
@@ -572,6 +573,48 @@ describe("Sprint 1 protected API flow", () => {
 
     expect(response.status).toBe(403);
     expect(body.error.code).toBe("confirmation_user_mismatch");
+  });
+
+  it("creates a role definition as an administrator", async () => {
+    const response = await handleRolesPost(
+      request("/api/v1/roles", {
+        method: "POST",
+        body: JSON.stringify({ slug: "vocalist", name: "Vocalist" }),
+      }),
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { role: { id: string; slug: string; name: string } };
+
+    expect(response.status).toBe(201);
+    expect(body.role).toEqual(
+      expect.objectContaining({ slug: "vocalist", name: "Vocalist", description: null }),
+    );
+  });
+
+  it("denies creating a role definition to non-administrators", async () => {
+    const response = await handleRolesPost(
+      request("/api/v1/roles", {
+        method: "POST",
+        body: JSON.stringify({ slug: "usher", name: "Usher" }),
+      }),
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects creating a role definition with a slug that already exists", async () => {
+    const response = await handleRolesPost(
+      request("/api/v1/roles", {
+        method: "POST",
+        body: JSON.stringify({ slug: "drummer", name: "Drummer (duplicate)" }),
+      }),
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("role_slug_already_exists");
   });
 
   it("pre-provisions a pending user by email as an administrator", async () => {

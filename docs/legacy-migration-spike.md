@@ -68,9 +68,13 @@ mechanism:
 
 1. An authorized coordinator exports the real member list (email, display
    name, role, `primaryInstrument`, `secondaryInstruments`) from the legacy
-   system into a local file. That file must never enter this repository, CI,
-   or any AI conversation — the same safety boundary already enforced for
-   the spike above.
+   Firestore project into a local file — either
+   `LEGACY_FIREBASE_PROJECT_ID=<legacy-project-id> npm run export:legacy-members
+   [output-path]` (`scripts/export-legacy-firestore-members.mjs`, using the
+   coordinator's own Firestore-read credentials for the *legacy* project
+   only), or any equivalent manual export in that same shape. That file must
+   never enter this repository, CI, or any AI conversation — the same safety
+   boundary already enforced for the spike above.
 2. Map legacy roles to `systemRole` using the mapping already established
    for the spike: `admin` → `administrator`, `*-leader` → `team_leader`,
    otherwise → `volunteer`.

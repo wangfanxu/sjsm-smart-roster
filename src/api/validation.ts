@@ -117,6 +117,12 @@ export const assistantAskInput = z
   })
   .strict();
 
+export const assistantConfirmInput = z
+  .object({
+    confirmationToken: z.string().trim().min(1),
+  })
+  .strict();
+
 export const uuidParameter = z.uuid();
 
 export async function parseJson<T>(request: Request, schema: z.ZodType<T>): Promise<T> {

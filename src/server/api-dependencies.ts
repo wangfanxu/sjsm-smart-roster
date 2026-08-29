@@ -26,7 +26,11 @@ export function getServerApiDependencies(): ApiDependencies {
     apiDependencies = {
       auth: getServerAuthDependencies(),
       service,
-      assistant: new AssistantService(classifier, service),
+      assistant: new AssistantService(
+        classifier,
+        service,
+        process.env.ASSISTANT_CONFIRMATION_SECRET ?? "",
+      ),
     };
   }
   return apiDependencies;

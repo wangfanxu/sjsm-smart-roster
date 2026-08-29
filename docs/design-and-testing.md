@@ -134,7 +134,7 @@ The intended test pyramid ([architecture.md §8](architecture.md#8-testing-strat
 All tests run against a real PostgreSQL-compatible engine (PGlite) executing the
 actual committed migration — chosen in [ADR 0001](adr/0001-use-drizzle-for-postgresql.md)
 specifically so integration tests exercise real SQL constraints instead of a mocked
-repository. Current suite (`npm test`, Vitest): **13 test files, 79 tests, all
+repository. Current suite (`npm test`, Vitest): **14 test files, 99 tests, all
 passing**.
 
 The conversational assistant (US-07) additionally follows the pattern
@@ -150,9 +150,10 @@ tier for the Capstone demo only) and its production caveat are recorded in
 | File | Covers |
 | --- | --- |
 | `src/db/schema.test.ts` | Migration applies cleanly; schema-level constraints (uniqueness, check constraints) behave as designed. |
-| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, publication, and the assistant endpoint (with a fake classifier). |
-| `src/assistant/assistant-service.test.ts` | Assistant reply logic against a fake classifier and a real `SmartRosterService`: correct EN/ZH templates, no-upcoming-assignment case, clarification/unsupported short-circuit without querying assignments, and that only the authenticated actor's ID is ever used even if the classifier tries to supply one (US-07). |
-| `src/assistant/gemini-intent-classifier.test.ts` | The classification contract (allowlisted tools, supported locales) and the real classifier's mapping/fallback logic against a fake Gemini client — no network call. |
+| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, publication, and the assistant's ask/confirm endpoints (with a fake classifier) — including a full prepare-then-confirm round trip verified against real availability rows. |
+| `src/assistant/assistant-service.test.ts` | Assistant reply logic against a fake classifier and a real `SmartRosterService`: correct EN/ZH templates, no-upcoming-assignment case, clarification/unsupported short-circuit without querying assignments, that only the authenticated actor's ID is ever used even if the classifier tries to supply one (US-07); and the full prepare/confirm write flow — no write on prepare alone, cancel-by-not-confirming, confirm executes the write, wrong-user and tampered-token rejection, and re-validating the date at confirm time even though prepare accepted it (US-08). |
+| `src/assistant/confirmation-token.test.ts` | The HMAC-signed confirmation token: round-trip, wrong secret, tampered payload, malformed token, and expiry boundary (US-08). |
+| `src/assistant/gemini-intent-classifier.test.ts` | The classification contract (allowlisted tools, supported locales, resolved-date format) and the real classifier's mapping/fallback logic against a fake Gemini client — no network call. |
 | `src/domain/smart-roster-service.test.ts` | Domain service methods (planning periods, services, roles, availability, assignment listing) against a fake `DomainRepository`. |
 | `src/domain/roster-generator.test.ts` | The constraint-based roster generator: hard-constraint enforcement (inactive/unavailable/unqualified volunteers excluded), infeasibility reporting for unfilled roles, soft-constraint scoring (primary-role fit, availability preference, load balance), coverage/fairness measures (US-04), and lock-aware regeneration including infeasible-lock detection (US-05). |
 | `src/auth/firebase-token-verifier.test.ts`, `src/auth/authorize.test.ts`, `src/auth/permissions.test.ts` | Firebase ID-token verification and role-based authorization, including negative/denied cases. |
@@ -207,7 +208,7 @@ suite gives evidence for both.
 | US-05 Lock and regenerate | Done (#5) | `PATCH .../candidates/{candidateId}/assignments/{assignmentId}`, `POST .../candidates/{candidateId}/regenerate`, `regenerateRosterCandidate` in `src/domain/roster-generator.ts` |
 | US-06 Publish a roster | Done (#6) | `POST .../candidates/{candidateId}/publish`, `publishRosterCandidate` in `src/db/domain-repository.ts` |
 | US-07 Ask for my next assignment | Done (#7) | `POST /api/v1/assistant/ask`, `src/assistant/` (service, Gemini classifier, templates), `npm run assistant:eval` |
-| US-08 Update availability through conversation | Open (#8) | prepare/confirm tool pair, [architecture.md §7](architecture.md#7-ai-tool-boundary) |
+| US-08 Update availability through conversation | Done (#8) | `POST /api/v1/assistant/ask` (prepare), `POST /api/v1/assistant/confirm`, `src/assistant/confirmation-token.ts` |
 | US-09 Notify assigned volunteers | Open (#9) | `notification_deliveries` (schema already in place) |
 
 Full acceptance criteria for each story: [capstone-plan.md](capstone-plan.md).

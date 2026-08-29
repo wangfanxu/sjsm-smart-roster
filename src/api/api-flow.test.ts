@@ -4,7 +4,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { handleAvailabilityPut } from "@/app/api/v1/me/availability/route";
+import { handleAvailabilityGet, handleAvailabilityPut } from "@/app/api/v1/me/availability/route";
+import { handleAssistantConfirmPost } from "@/app/api/v1/assistant/confirm/route";
 import { handleAssignmentsGet } from "@/app/api/v1/me/assignments/route";
 import {
   handlePlanningPeriodsPost,
@@ -103,7 +104,12 @@ describe("Sprint 1 protected API flow", () => {
         userRepository: createUserRepository(postgresCompatible),
       },
       service,
-      assistant: new AssistantService(fakeClassifier(classification), service),
+      assistant: new AssistantService(
+        fakeClassifier(classification),
+        service,
+        "test-secret",
+        () => new Date("2026-08-27T04:00:00Z"),
+      ),
     };
   }
 
@@ -453,6 +459,114 @@ describe("Sprint 1 protected API flow", () => {
 
     expect(response.status).toBe(401);
   });
+
+  it("prepares and confirms a conversational mark-unavailable request end to end", async () => {
+    const prepareResponse = await handleAssistantAskPost(
+      request("/api/v1/assistant/ask", {
+        method: "POST",
+        body: JSON.stringify({ message: "I can't serve on September 20" }),
+      }),
+      dependencies("firebase-volunteer", {
+        intent: "prepare_mark_unavailable",
+        locale: "en",
+        serviceDate: "2026-09-20",
+      }),
+    );
+    const prepareBody = (await prepareResponse.json()) as {
+      intent: string;
+      confirmationToken: string;
+      pendingServiceDate: string;
+      message: string;
+    };
+
+    expect(prepareResponse.status).toBe(200);
+    expect(prepareBody.intent).toBe("prepare_mark_unavailable");
+    expect(prepareBody.pendingServiceDate).toBe("2026-09-20");
+    expect(prepareBody.message).toContain("2026-09-20");
+
+    const beforeConfirm = await handleAvailabilityGet(
+      request("/api/v1/me/availability"),
+      dependencies("firebase-volunteer"),
+    );
+    const beforeBody = (await beforeConfirm.json()) as {
+      availability: Array<{ serviceDate: string }>;
+    };
+    expect(beforeBody.availability.some((entry) => entry.serviceDate === "2026-09-20")).toBe(false);
+
+    const confirmResponse = await handleAssistantConfirmPost(
+      request("/api/v1/assistant/confirm", {
+        method: "POST",
+        body: JSON.stringify({ confirmationToken: prepareBody.confirmationToken }),
+      }),
+      dependencies("firebase-volunteer"),
+    );
+    const confirmBody = (await confirmResponse.json()) as { serviceDate: string; message: string };
+
+    expect(confirmResponse.status).toBe(200);
+    expect(confirmBody.serviceDate).toBe("2026-09-20");
+
+    const afterConfirm = await handleAvailabilityGet(
+      request("/api/v1/me/availability"),
+      dependencies("firebase-volunteer"),
+    );
+    const afterBody = (await afterConfirm.json()) as {
+      availability: Array<{ serviceDate: string; status: string }>;
+    };
+    expect(afterBody.availability).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ serviceDate: "2026-09-20", status: "unavailable" }),
+      ]),
+    );
+  });
+
+  it("never writes availability when the volunteer never confirms (cancel)", async () => {
+    await handleAssistantAskPost(
+      request("/api/v1/assistant/ask", {
+        method: "POST",
+        body: JSON.stringify({ message: "我下周三不能服侍" }),
+      }),
+      dependencies("firebase-volunteer", {
+        intent: "prepare_mark_unavailable",
+        locale: "zh",
+        serviceDate: "2026-09-23",
+      }),
+    );
+
+    const response = await handleAvailabilityGet(
+      request("/api/v1/me/availability"),
+      dependencies("firebase-volunteer"),
+    );
+    const body = (await response.json()) as { availability: Array<{ serviceDate: string }> };
+
+    expect(body.availability.some((entry) => entry.serviceDate === "2026-09-23")).toBe(false);
+  });
+
+  it("denies confirming a mark-unavailable request issued to a different volunteer", async () => {
+    const prepareResponse = await handleAssistantAskPost(
+      request("/api/v1/assistant/ask", {
+        method: "POST",
+        body: JSON.stringify({ message: "I can't serve on September 21" }),
+      }),
+      dependencies("firebase-volunteer", {
+        intent: "prepare_mark_unavailable",
+        locale: "en",
+        serviceDate: "2026-09-21",
+      }),
+    );
+    const { confirmationToken } = (await prepareResponse.json()) as { confirmationToken: string };
+
+    const response = await handleAssistantConfirmPost(
+      request("/api/v1/assistant/confirm", {
+        method: "POST",
+        body: JSON.stringify({ confirmationToken }),
+      }),
+      dependencies("firebase-other"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("confirmation_user_mismatch");
+  });
 });
 
 describe("Sprint 2 lock and regenerate flow", () => {
@@ -508,7 +622,12 @@ describe("Sprint 2 lock and regenerate flow", () => {
         userRepository: createUserRepository(postgresCompatible),
       },
       service,
-      assistant: new AssistantService(fakeClassifier({ intent: "ambiguous", locale: "en" }), service),
+      assistant: new AssistantService(
+        fakeClassifier({ intent: "ambiguous", locale: "en" }),
+        service,
+        "test-secret",
+        () => new Date("2026-08-27T04:00:00Z"),
+      ),
     };
   }
 

@@ -88,25 +88,44 @@ Initial assistant tools:
 - `get_my_next_assignment` — implemented (`POST /api/v1/assistant/ask`, US-07)
 - `get_my_assignments_for_period`
 - `get_my_availability`
-- `prepare_mark_unavailable`
-- `confirm_mark_unavailable`
+- `prepare_mark_unavailable` — implemented (`POST /api/v1/assistant/ask`, US-08)
+- `confirm_mark_unavailable` — implemented (`POST /api/v1/assistant/confirm`, US-08)
 
 The authenticated user ID is injected by the server and is never accepted from model-generated arguments.
 
-`get_my_next_assignment` is implemented as an LLM structured-output classification
+Both tools are implemented as one LLM structured-output classification call
 (`src/assistant/gemini-intent-classifier.ts`, Gemini 3.1 Flash-Lite — see
 [ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md))
-over three allowlisted outcomes — the supported tool, `unsupported_request`,
-or `clarification_needed` — plus locale detection (`en`/`zh`). The server
-executes the actual structured query
-(`SmartRosterService.listMyUpcomingAssignments`) and composes the reply from a
-fixed, per-locale template (`src/assistant/reply-templates.ts`); the LLM never
-authors the final user-facing sentence and never supplies a user ID. Any
-classifier failure (parse error, rate limit, network error) degrades to a
-safe `ambiguous` clarification rather than a 500. The provider lives behind
-a small `IntentClassifier` interface (`src/assistant/types.ts`), so swapping
-providers touches only the classifier file, not the service, templates, or
-route.
+over four allowlisted outcomes — `get_my_next_assignment`,
+`prepare_mark_unavailable`, `unsupported_request`, or `clarification_needed`
+— plus locale detection (`en`/`zh`). For `prepare_mark_unavailable`, the
+model is also given today's Singapore calendar date and asked to resolve
+any relative date expression ("tomorrow", "next Sunday", "9月5日") into an
+absolute `YYYY-MM-DD`, or `null` if it cannot confidently resolve one; a
+`null` date degrades to an `ambiguous` clarification rather than guessing.
+The server executes the actual structured query
+(`SmartRosterService.listMyUpcomingAssignments`) or write
+(`SmartRosterService.setMyAvailability`) and composes the reply from a
+fixed, per-locale template (`src/assistant/reply-templates.ts`); the LLM
+never authors the final user-facing sentence and never supplies a user ID.
+Any classifier failure (parse error, rate limit, network error) degrades to
+a safe `ambiguous` clarification rather than a 500. The provider lives
+behind a small `IntentClassifier` interface (`src/assistant/types.ts`), so
+swapping providers touches only the classifier file, not the service,
+templates, or routes.
+
+`prepare_mark_unavailable` never writes by itself — it returns a
+self-contained, HMAC-signed confirmation token
+(`src/assistant/confirmation-token.ts`) carrying the proposed date, the
+requesting user's ID, the reply locale, and a 5-minute expiry. `POST
+/api/v1/assistant/confirm` verifies the signature and expiry, rejects if
+the token's user does not match the authenticated caller
+(`403 confirmation_user_mismatch`), and only then calls
+`setMyAvailability` — which independently re-checks the date is not in the
+past using the current clock, not anything decided at prepare time. No
+database row or server-side session backs a pending confirmation: if the
+volunteer never calls `/confirm`, nothing happens and there is nothing to
+clean up.
 
 ## 8. Testing strategy
 

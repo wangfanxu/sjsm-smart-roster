@@ -25,6 +25,9 @@ function repositoryStub(): DomainRepository {
     getRosterCandidateDetail: vi.fn(),
     setAssignmentLock: vi.fn(),
     publishRosterCandidate: vi.fn(),
+    getOrCreateNotifications: vi.fn(),
+    markNotificationSent: vi.fn(),
+    markNotificationFailed: vi.fn(),
   };
 }
 

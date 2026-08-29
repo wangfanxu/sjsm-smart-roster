@@ -21,6 +21,9 @@ function repositoryStub(): DomainRepository {
     getRosterCandidateDetail: vi.fn(),
     setAssignmentLock: vi.fn(),
     publishRosterCandidate: vi.fn(),
+    getOrCreateNotifications: vi.fn(),
+    markNotificationSent: vi.fn(),
+    markNotificationFailed: vi.fn(),
   };
 }
 
@@ -245,6 +248,7 @@ describe("SmartRosterService", () => {
           roleName: "Drummer",
           userId: "volunteer",
           userDisplayName: "Volunteer",
+          userEmail: "volunteer@example.test",
           isLocked: true,
           source: "solver",
         },

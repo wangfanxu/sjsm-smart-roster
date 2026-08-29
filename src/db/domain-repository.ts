@@ -6,6 +6,7 @@ import type {
   DomainRepository,
   GeneratedCandidateDraft,
   MemberRoleInput,
+  PendingNotificationInput,
   PlanningPeriodInput,
   RosterGenerationSource,
   ServiceInput,
@@ -15,6 +16,7 @@ import {
   assignments,
   auditEvents,
   availability,
+  notificationDeliveries,
   planningPeriods,
   roles,
   rosterCandidates,
@@ -441,6 +443,7 @@ export function createDomainRepository(
           roleName: roles.name,
           userId: users.id,
           userDisplayName: users.displayName,
+          userEmail: users.email,
           isLocked: assignments.isLocked,
           source: assignments.source,
         })
@@ -555,6 +558,68 @@ export function createDomainRepository(
 
         return { ...published, status: "published" as const };
       });
+    },
+
+    async getOrCreateNotifications(entries: ReadonlyArray<PendingNotificationInput>) {
+      if (entries.length === 0) return [];
+      return database.transaction(async (transaction) => {
+        await transaction
+          .insert(notificationDeliveries)
+          .values(
+            entries.map((entry) => ({
+              userId: entry.userId,
+              recipientEmail: entry.recipientEmail,
+              eventType: entry.eventType,
+              idempotencyKey: entry.idempotencyKey,
+            })),
+          )
+          .onConflictDoNothing({ target: notificationDeliveries.idempotencyKey });
+
+        return transaction
+          .select({
+            id: notificationDeliveries.id,
+            userId: notificationDeliveries.userId,
+            recipientEmail: notificationDeliveries.recipientEmail,
+            eventType: notificationDeliveries.eventType,
+            idempotencyKey: notificationDeliveries.idempotencyKey,
+            status: notificationDeliveries.status,
+          })
+          .from(notificationDeliveries)
+          .where(
+            and(
+              inArray(
+                notificationDeliveries.idempotencyKey,
+                entries.map((entry) => entry.idempotencyKey),
+              ),
+              ne(notificationDeliveries.status, "sent"),
+            ),
+          );
+      });
+    },
+
+    async markNotificationSent(notificationId: string, providerMessageId: string) {
+      await database
+        .update(notificationDeliveries)
+        .set({
+          status: "sent",
+          providerMessageId,
+          sentAt: new Date(),
+          attemptCount: sql`${notificationDeliveries.attemptCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationDeliveries.id, notificationId));
+    },
+
+    async markNotificationFailed(notificationId: string, error: string) {
+      await database
+        .update(notificationDeliveries)
+        .set({
+          status: "failed",
+          lastError: error,
+          attemptCount: sql`${notificationDeliveries.attemptCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationDeliveries.id, notificationId));
     },
   };
 }

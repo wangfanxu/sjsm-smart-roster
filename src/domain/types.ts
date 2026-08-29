@@ -118,6 +118,7 @@ export type RosterCandidateAssignmentDetail = Readonly<{
   roleName: string;
   userId: string;
   userDisplayName: string;
+  userEmail: string;
   isLocked: boolean;
   source: "solver" | "manual";
 }>;
@@ -125,6 +126,24 @@ export type RosterCandidateAssignmentDetail = Readonly<{
 export type RosterCandidateDetail = Readonly<{
   candidate: RosterCandidateSummary & { configuration: Record<string, unknown> };
   assignments: ReadonlyArray<RosterCandidateAssignmentDetail>;
+}>;
+
+export type NotificationStatus = "pending" | "sent" | "failed";
+
+export type PendingNotificationInput = Readonly<{
+  userId: string;
+  recipientEmail: string;
+  eventType: string;
+  idempotencyKey: string;
+}>;
+
+export type NotificationDelivery = Readonly<{
+  id: string;
+  userId: string;
+  recipientEmail: string;
+  eventType: string;
+  idempotencyKey: string;
+  status: NotificationStatus;
 }>;
 
 export interface DomainRepository {
@@ -179,6 +198,18 @@ export interface DomainRepository {
     candidateId: string,
     actorUserId: string,
   ): Promise<{ id: string; planningPeriodId: string; version: number; status: "published" }>;
+  /**
+   * Inserts any notifications that don't already exist for their
+   * idempotency key, then returns every matching notification (freshly
+   * inserted or pre-existing) that has not yet been sent - so a retried
+   * call picks up anything still pending/failed without ever re-sending
+   * one already marked "sent" or creating a duplicate row.
+   */
+  getOrCreateNotifications(
+    entries: ReadonlyArray<PendingNotificationInput>,
+  ): Promise<NotificationDelivery[]>;
+  markNotificationSent(notificationId: string, providerMessageId: string): Promise<void>;
+  markNotificationFailed(notificationId: string, error: string): Promise<void>;
 }
 
 export type Actor = Pick<AuthenticatedPrincipal, "userId">;

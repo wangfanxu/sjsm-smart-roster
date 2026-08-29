@@ -19,6 +19,8 @@ function createDependencies(options: {
   user?: ApplicationUser | null;
   role?: SystemRole;
   tokenError?: Error;
+  email?: string | null;
+  linkedUser?: ApplicationUser | null;
 } = {}) {
   const user =
     options.user === undefined
@@ -26,15 +28,20 @@ function createDependencies(options: {
       : options.user;
   const verifyIdToken = options.tokenError
     ? vi.fn().mockRejectedValue(options.tokenError)
-    : vi.fn().mockResolvedValue({ uid: "firebase-current" });
+    : vi.fn().mockResolvedValue({
+        uid: "firebase-current",
+        email: options.email === undefined ? "current@example.test" : options.email,
+      });
   const findByFirebaseUid = vi.fn().mockResolvedValue(user);
+  const linkPendingUserByEmail = vi.fn().mockResolvedValue(options.linkedUser ?? null);
 
   return {
     dependencies: {
       tokenVerifier: { verifyIdToken },
-      userRepository: { findByFirebaseUid },
+      userRepository: { findByFirebaseUid, linkPendingUserByEmail },
     } satisfies AuthDependencies,
     findByFirebaseUid,
+    linkPendingUserByEmail,
     verifyIdToken,
   };
 }
@@ -74,6 +81,57 @@ describe("server authentication", () => {
       .toMatchObject({ code: "user_not_registered", status: 403 });
     await expect(authenticateRequest(authenticatedRequest(), inactive.dependencies)).rejects
       .toMatchObject({ code: "user_inactive", status: 403 });
+  });
+
+  it("links a pending user by email on first sign-in when no firebase_uid match exists", async () => {
+    const linkedUser = createUser({ id: "user-pending", firebaseUid: "firebase-current" });
+    const { dependencies, findByFirebaseUid, linkPendingUserByEmail } = createDependencies({
+      user: null,
+      linkedUser,
+    });
+
+    const principal = await authenticateRequest(authenticatedRequest(), dependencies);
+
+    expect(findByFirebaseUid).toHaveBeenCalledWith("firebase-current");
+    expect(linkPendingUserByEmail).toHaveBeenCalledWith(
+      "current@example.test",
+      "firebase-current",
+    );
+    expect(principal.userId).toBe("user-pending");
+  });
+
+  it("rejects when no firebase_uid match and no pending row exists to link", async () => {
+    const { dependencies, linkPendingUserByEmail } = createDependencies({
+      user: null,
+      linkedUser: null,
+    });
+
+    await expect(authenticateRequest(authenticatedRequest(), dependencies)).rejects.toMatchObject({
+      code: "user_not_registered",
+      status: 403,
+    });
+    expect(linkPendingUserByEmail).toHaveBeenCalled();
+  });
+
+  it("never attempts to link when the token carries no email", async () => {
+    const { dependencies, linkPendingUserByEmail } = createDependencies({
+      user: null,
+      email: null,
+    });
+
+    await expect(authenticateRequest(authenticatedRequest(), dependencies)).rejects.toMatchObject({
+      code: "user_not_registered",
+      status: 403,
+    });
+    expect(linkPendingUserByEmail).not.toHaveBeenCalled();
+  });
+
+  it("does not attempt to link when a direct firebase_uid match already exists", async () => {
+    const { dependencies, linkPendingUserByEmail } = createDependencies();
+
+    await authenticateRequest(authenticatedRequest(), dependencies);
+
+    expect(linkPendingUserByEmail).not.toHaveBeenCalled();
   });
 
   it("derives identity only from the verified token, ignoring client user IDs", async () => {

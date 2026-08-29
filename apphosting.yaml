@@ -41,3 +41,31 @@ env:
     secret: sjsm-smart-roster-resend-api-key
     availability:
       - RUNTIME
+
+  # Firebase Web SDK config for the browser sign-in UI. Not secret - see
+  # .env.example. Needs BUILD availability because Next.js inlines
+  # NEXT_PUBLIC_* variables into the client bundle at build time, not just
+  # runtime.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyCWkzgozfVhtuUghhwGerZSMOD03-w4Jag
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: sjsm-smart-roster.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: sjsm-smart-roster
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:931004635367:web:070f5bb1bb444226106a42"
+    availability:
+      - BUILD
+      - RUNTIME

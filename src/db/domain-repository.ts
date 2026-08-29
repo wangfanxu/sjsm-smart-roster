@@ -7,6 +7,7 @@ import type {
   GeneratedCandidateDraft,
   MemberRoleInput,
   PendingNotificationInput,
+  PendingUserInput,
   PlanningPeriodInput,
   RosterGenerationSource,
   ServiceInput,
@@ -103,6 +104,40 @@ export function createDomainRepository(
 
     async listRoles() {
       return database.select().from(roles).orderBy(asc(roles.name));
+    },
+
+    async createPendingUser(input: PendingUserInput, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, input.email))
+          .limit(1);
+        if (existing) {
+          throw new ApiError("email_already_registered", 409, "A user with this email already exists");
+        }
+        const [user] = await transaction
+          .insert(users)
+          .values({
+            email: input.email,
+            displayName: input.displayName,
+            systemRole: input.systemRole,
+          })
+          .returning({
+            id: users.id,
+            email: users.email,
+            displayName: users.displayName,
+            systemRole: users.systemRole,
+          });
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "user.pre_provisioned",
+          entityType: "user",
+          entityId: user.id,
+          metadata: { email: input.email, systemRole: input.systemRole },
+        });
+        return user;
+      });
     },
 
     async replaceMemberRoles(userId: string, capabilities: MemberRoleInput, actorUserId: string) {

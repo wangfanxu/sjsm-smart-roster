@@ -4,14 +4,23 @@ SmartRoster retains Firebase Authentication as its identity provider while makin
 
 ## Request flow
 
-1. The browser signs in with Firebase Authentication and obtains an ID token.
+1. The browser signs in with Firebase Authentication (Google sign-in) and obtains an ID token.
 2. It sends the token as `Authorization: Bearer <token>` over HTTPS.
 3. The server verifies signature, audience, issuer, expiry, and revocation with Firebase Admin SDK.
 4. The verified Firebase UID is used to look up an active application user in PostgreSQL.
-5. The user's database `system_role` is evaluated against the permission required by the operation.
-6. Domain services receive the authenticated principal injected by the server.
+5. If no row matches the UID (first sign-in), the server tries the token's verified email against a **pending** row — one an administrator pre-provisioned with `firebase_uid = NULL` — and links it (§ Account provisioning below).
+6. The user's database `system_role` is evaluated against the permission required by the operation.
+7. Domain services receive the authenticated principal injected by the server.
 
 Firebase custom claims, request bodies, query strings, route parameters, and model-generated tool arguments are never accepted as the current application user or as the source of role permissions.
+
+## Account provisioning
+
+There is no self-registration. `firebase_uid` on `users` is nullable specifically to support inviting someone before they have ever signed in:
+
+1. An administrator calls `POST /api/v1/users` (`user:manage`) with the volunteer's email, display name, and system role. This inserts a row with `firebase_uid = NULL` — a "pending" account. A duplicate email is rejected with `409 email_already_registered`.
+2. The first time that email signs in with Google, `UserRepository.linkPendingUserByEmail` runs a single `UPDATE ... WHERE email = ? AND firebase_uid IS NULL`, atomically claiming the row for that Firebase UID. Every later sign-in matches directly by `firebase_uid`, so the email lookup never runs again for that account.
+3. Because the claim requires `firebase_uid IS NULL`, a second Google account cannot ever "steal" an already-linked row — the `WHERE` clause simply matches nothing once the first sign-in has claimed it. A Google account whose email matches no row (pending or linked) is rejected as `403 user_not_registered`, same as any other unregistered identity.
 
 ## Roles
 

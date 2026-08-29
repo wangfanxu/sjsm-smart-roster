@@ -42,6 +42,12 @@ flowchart TD
   provider (Resend), so the provider is replaceable. Best-effort and
   idempotent: sending happens only after a publish has already committed,
   and retries never duplicate a delivery already marked `sent`.
+- **Authenticated frontend** (Sprint 4, UI-01 — `src/app/[locale]/(app)`) — a
+  Google sign-in screen and a role-aware authenticated shell that every
+  other screen (dashboard, assistant, administration) renders inside. There
+  is no self-registration: an administrator pre-provisions a pending
+  account by email (`POST /api/v1/users`), and it links to a real identity
+  on that email's first Google sign-in.
 
 Full narrative and the deployment diagram: [architecture.md](architecture.md).
 Full entity list and invariants: [domain-model.md](domain-model.md).
@@ -139,7 +145,7 @@ The intended test pyramid ([architecture.md §9](architecture.md#9-testing-strat
 All tests run against a real PostgreSQL-compatible engine (PGlite) executing the
 actual committed migration — chosen in [ADR 0001](adr/0001-use-drizzle-for-postgresql.md)
 specifically so integration tests exercise real SQL constraints instead of a mocked
-repository. Current suite (`npm test`, Vitest): **16 test files, 113 tests, all
+repository. Current suite (`npm test`, Vitest): **17 test files, 127 tests, all
 passing**.
 
 The conversational assistant (US-07) additionally follows the pattern
@@ -155,7 +161,7 @@ tier for the Capstone demo only) and its production caveat are recorded in
 | File | Covers |
 | --- | --- |
 | `src/db/schema.test.ts` | Migration applies cleanly; schema-level constraints (uniqueness, check constraints) behave as designed. |
-| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, publication, the assistant's ask/confirm endpoints (with a fake classifier) — including a full prepare-then-confirm round trip verified against real availability rows — and roster-published email notifications after publish (sent, idempotent retry, and failure-does-not-affect-publish, all against a fake `EmailSender`). |
+| `src/api/api-flow.test.ts` | End-to-end route-handler flows against a real migrated database, including roster-candidate generation, review, locking, regeneration, publication, the assistant's ask/confirm endpoints (with a fake classifier) — including a full prepare-then-confirm round trip verified against real availability rows — roster-published email notifications after publish (sent, idempotent retry, and failure-does-not-affect-publish, all against a fake `EmailSender`), and pre-provisioning a user by email through to their first real sign-in linking and authorizing correctly (UI-01). |
 | `src/assistant/assistant-service.test.ts` | Assistant reply logic against a fake classifier and a real `SmartRosterService`: correct EN/ZH templates, no-upcoming-assignment case, clarification/unsupported short-circuit without querying assignments, that only the authenticated actor's ID is ever used even if the classifier tries to supply one (US-07); and the full prepare/confirm write flow — no write on prepare alone, cancel-by-not-confirming, confirm executes the write, wrong-user and tampered-token rejection, and re-validating the date at confirm time even though prepare accepted it (US-08). |
 | `src/assistant/confirmation-token.test.ts` | The HMAC-signed confirmation token: round-trip, wrong secret, tampered payload, malformed token, and expiry boundary (US-08). |
 | `src/assistant/gemini-intent-classifier.test.ts` | The classification contract (allowlisted tools, supported locales, resolved-date format) and the real classifier's mapping/fallback logic against a fake Gemini client — no network call. |
@@ -163,7 +169,8 @@ tier for the Capstone demo only) and its production caveat are recorded in
 | `src/notifications/resend-email-sender.test.ts` | The Resend HTTP request shape (auth header, JSON body) and error handling (non-2xx status, missing message id) against a fake `fetch` — no network call. |
 | `src/domain/smart-roster-service.test.ts` | Domain service methods (planning periods, services, roles, availability, assignment listing) against a fake `DomainRepository`. |
 | `src/domain/roster-generator.test.ts` | The constraint-based roster generator: hard-constraint enforcement (inactive/unavailable/unqualified volunteers excluded), infeasibility reporting for unfilled roles, soft-constraint scoring (primary-role fit, availability preference, load balance), coverage/fairness measures (US-04), and lock-aware regeneration including infeasible-lock detection (US-05). |
-| `src/auth/firebase-token-verifier.test.ts`, `src/auth/authorize.test.ts`, `src/auth/permissions.test.ts` | Firebase ID-token verification and role-based authorization, including negative/denied cases. |
+| `src/auth/firebase-token-verifier.test.ts`, `src/auth/authorize.test.ts`, `src/auth/permissions.test.ts` | Firebase ID-token verification and role-based authorization, including negative/denied cases, and the pending-account-by-email linking fallback on first sign-in (UI-01). |
+| `src/db/user-repository.test.ts` | The pending-account link against a real migrated database: successful link, no hijacking an already-linked row, no match at all, and only one of two concurrent link attempts for the same row succeeding (UI-01). |
 | `src/migration/legacy-migration.test.ts` | Legacy migration spike behavior (synthetic-data-only guard, aggregate validation output). |
 | `src/i18n/config.test.ts` | English/Simplified Chinese locale configuration required by the product's bilingual UI rule. |
 | `src/lib/health.test.ts` | `/api/health` deployment-verification endpoint. |

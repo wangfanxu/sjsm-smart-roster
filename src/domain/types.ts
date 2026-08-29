@@ -18,6 +18,12 @@ export type MemberRoleInput = ReadonlyArray<
   Readonly<{ roleId: string; proficiency: "primary" | "secondary" }>
 >;
 
+export type PendingUserInput = Readonly<{
+  email: string;
+  displayName: string;
+  systemRole: "volunteer" | "team_leader" | "administrator";
+}>;
+
 export type AvailabilityInput = Readonly<{
   serviceDate: string;
   status: "available" | "unavailable" | "preferred";
@@ -157,6 +163,10 @@ export interface DomainRepository {
   } | null>;
   createService(input: ServiceInput, actorUserId: string): Promise<unknown>;
   listRoles(): Promise<unknown[]>;
+  createPendingUser(
+    input: PendingUserInput,
+    actorUserId: string,
+  ): Promise<{ id: string; email: string; displayName: string; systemRole: string }>;
   replaceMemberRoles(
     userId: string,
     capabilities: MemberRoleInput,

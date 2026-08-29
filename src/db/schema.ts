@@ -58,7 +58,9 @@ const timestamps = {
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
-  firebaseUid: text("firebase_uid").notNull().unique(),
+  // Null until the invited email signs in for the first time; see
+  // UserRepository.linkPendingUserByEmail.
+  firebaseUid: text("firebase_uid").unique(),
   email: text("email").notNull().unique(),
   displayName: text("display_name").notNull(),
   systemRole: systemRole("system_role").default("volunteer").notNull(),

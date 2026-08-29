@@ -29,19 +29,25 @@ export async function authenticateRequest(
 ): Promise<AuthenticatedPrincipal> {
   const token = readBearerToken(request);
 
-  let firebaseUid: string;
+  let decodedToken: { uid: string; email: string | null };
   try {
-    const decodedToken = await dependencies.tokenVerifier.verifyIdToken(token);
-    firebaseUid = decodedToken.uid;
+    decodedToken = await dependencies.tokenVerifier.verifyIdToken(token);
   } catch {
     throw new AuthError("invalid_token", 401, "The Firebase ID token is invalid or expired");
   }
 
-  if (!firebaseUid) {
+  if (!decodedToken.uid) {
     throw new AuthError("invalid_token", 401, "The Firebase ID token has no user identity");
   }
 
-  const user = await dependencies.userRepository.findByFirebaseUid(firebaseUid);
+  let user = await dependencies.userRepository.findByFirebaseUid(decodedToken.uid);
+
+  if (!user && decodedToken.email) {
+    user = await dependencies.userRepository.linkPendingUserByEmail(
+      decodedToken.email,
+      decodedToken.uid,
+    );
+  }
 
   if (!user) {
     throw new AuthError(

@@ -46,6 +46,10 @@ npm run dev
 
 Open `http://localhost:3000`. The root route redirects to the English experience at `/en`; the Simplified Chinese experience is available at `/zh`.
 
+## Signing in
+
+Sign-in uses Google, via Firebase Authentication. There is no self-registration — an administrator must pre-provision your account by email first (`POST /api/v1/users`); your Google sign-in then links to it automatically the first time. Copy `.env.example` to `.env.local` for the Firebase Web SDK config (`NEXT_PUBLIC_FIREBASE_*` — not secret, safe to commit as an example since Firebase security comes from Auth + server-side authorization, not from hiding these values). See [authentication and authorization](docs/authentication-and-authorization.md#account-provisioning) for the full flow.
+
 ## Quality checks
 
 Run the same checks used by CI:

@@ -22,7 +22,7 @@ export function createFirebaseTokenVerifier(
   return {
     async verifyIdToken(token) {
       const decodedToken = await firebaseAuth.verifyIdToken(token, true);
-      return { uid: decodedToken.uid };
+      return { uid: decodedToken.uid, email: decodedToken.email ?? null };
     },
   };
 }

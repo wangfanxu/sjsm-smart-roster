@@ -1,5 +1,4 @@
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { readAllMigrationsSql } from "@/db/apply-migrations-for-tests";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle, type PgliteDatabase } from "drizzle-orm/pglite";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
@@ -25,13 +24,14 @@ import type { ClassificationResult, IntentClassifier } from "@/assistant/types";
 import { NotificationService } from "@/notifications/notification-service";
 import type { EmailSender } from "@/notifications/types";
 import { handleMemberRolesPut } from "@/app/api/v1/users/[userId]/roles/route";
+import { handleUsersPost } from "@/app/api/v1/users/route";
+import { authenticateRequest } from "@/auth/authorize";
 import { createUserRepository } from "@/db/user-repository";
 import { createDomainRepository } from "@/db/domain-repository";
 import * as schema from "@/db/schema";
 import { SmartRosterService } from "@/domain/smart-roster-service";
 import type { ApiDependencies } from "@/server/api-dependencies";
 
-const migrationPath = fileURLToPath(new URL("../../drizzle/0000_icy_sage.sql", import.meta.url));
 const adminId = "00000000-0000-4000-a000-000000000001";
 const volunteerId = "00000000-0000-4000-a000-000000000002";
 const otherUserId = "00000000-0000-4000-a000-000000000003";
@@ -62,7 +62,7 @@ describe("Sprint 1 protected API flow", () => {
 
   beforeAll(async () => {
     pglite = await PGlite.create();
-    await pglite.exec(await readFile(migrationPath, "utf8"));
+    await pglite.exec(await readAllMigrationsSql());
     database = drizzle(pglite, { schema });
     await pglite.exec(`
       INSERT INTO users (id, firebase_uid, email, display_name, system_role) VALUES
@@ -105,7 +105,7 @@ describe("Sprint 1 protected API flow", () => {
     const service = new SmartRosterService(repository, () => new Date("2026-08-27T04:00:00Z"));
     return {
       auth: {
-        tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
+        tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid, email: null }) },
         userRepository: createUserRepository(postgresCompatible),
       },
       service,
@@ -573,6 +573,101 @@ describe("Sprint 1 protected API flow", () => {
     expect(response.status).toBe(403);
     expect(body.error.code).toBe("confirmation_user_mismatch");
   });
+
+  it("pre-provisions a pending user by email as an administrator", async () => {
+    const response = await handleUsersPost(
+      request("/api/v1/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "new-volunteer@example.test",
+          displayName: "New Volunteer",
+          systemRole: "volunteer",
+        }),
+      }),
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { user: { id: string; email: string } };
+
+    expect(response.status).toBe(201);
+    expect(body.user.email).toBe("new-volunteer@example.test");
+
+    const row = await pglite.query<{ firebase_uid: string | null }>(`
+      SELECT firebase_uid FROM users WHERE id = '${body.user.id}'
+    `);
+    expect(row.rows[0].firebase_uid).toBeNull();
+  });
+
+  it("denies pre-provisioning a user to non-administrators", async () => {
+    const response = await handleUsersPost(
+      request("/api/v1/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "another-volunteer@example.test",
+          displayName: "Another Volunteer",
+          systemRole: "volunteer",
+        }),
+      }),
+      dependencies(),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
+  it("rejects pre-provisioning a user with an email that is already registered", async () => {
+    const response = await handleUsersPost(
+      request("/api/v1/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "volunteer@example.test",
+          displayName: "Duplicate",
+          systemRole: "volunteer",
+        }),
+      }),
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("email_already_registered");
+  });
+
+  it("links a pre-provisioned account on first Google sign-in and applies the assigned role", async () => {
+    const postgresCompatible = database as unknown as PostgresJsDatabase<typeof schema>;
+    const provisionResponse = await handleUsersPost(
+      request("/api/v1/users", {
+        method: "POST",
+        body: JSON.stringify({
+          email: "first-sign-in@example.test",
+          displayName: "First Sign In",
+          systemRole: "team_leader",
+        }),
+      }),
+      dependencies("firebase-admin"),
+    );
+    expect(provisionResponse.status).toBe(201);
+
+    const authDependencies = {
+      tokenVerifier: {
+        verifyIdToken: async () => ({ uid: "google-new-uid", email: "first-sign-in@example.test" }),
+      },
+      userRepository: createUserRepository(postgresCompatible),
+    };
+
+    const principal = await authenticateRequest(
+      new Request("https://example.test", { headers: { authorization: "Bearer any-token" } }),
+      authDependencies,
+    );
+    expect(principal).toMatchObject({
+      email: "first-sign-in@example.test",
+      systemRole: "team_leader",
+    });
+
+    const secondSignIn = await authenticateRequest(
+      new Request("https://example.test", { headers: { authorization: "Bearer any-token" } }),
+      authDependencies,
+    );
+    expect(secondSignIn.userId).toBe(principal.userId);
+  });
 });
 
 describe("Sprint 2 lock and regenerate flow", () => {
@@ -589,7 +684,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
 
   beforeAll(async () => {
     pglite = await PGlite.create();
-    await pglite.exec(await readFile(migrationPath, "utf8"));
+    await pglite.exec(await readAllMigrationsSql());
     database = drizzle(pglite, { schema });
     await pglite.exec(`
       INSERT INTO users (id, firebase_uid, email, display_name, system_role) VALUES
@@ -625,7 +720,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
     const service = new SmartRosterService(repository, () => new Date("2026-08-27T04:00:00Z"));
     return {
       auth: {
-        tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid }) },
+        tokenVerifier: { verifyIdToken: async () => ({ uid: firebaseUid, email: null }) },
         userRepository: createUserRepository(postgresCompatible),
       },
       service,

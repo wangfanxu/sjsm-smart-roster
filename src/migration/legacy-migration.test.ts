@@ -2,14 +2,12 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { readAllMigrationsSql } from "@/db/apply-migrations-for-tests";
 // @ts-expect-error The executable migration spike is intentionally plain ESM.
 import { buildMigrationSql, transformLegacyFixture } from "../../scripts/legacy-migration-spike.mjs";
 
 const fixturePath = fileURLToPath(
   new URL("../../fixtures/legacy/synthetic-firestore.json", import.meta.url),
-);
-const schemaMigrationPath = fileURLToPath(
-  new URL("../../drizzle/0000_icy_sage.sql", import.meta.url),
 );
 const generatedSqlPath = fileURLToPath(
   new URL("../../artifacts/migration/legacy-migration.sql", import.meta.url),
@@ -27,7 +25,7 @@ describe("legacy migration spike", () => {
 
   beforeEach(async () => {
     database = await PGlite.create();
-    await database.exec(await readFile(schemaMigrationPath, "utf8"));
+    await database.exec(await readAllMigrationsSql());
   });
 
   afterEach(async () => {

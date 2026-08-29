@@ -47,42 +47,58 @@ Tests create a fresh in-memory PostgreSQL instance, apply the version-controlled
 
 Before any real adoption, an authorized coordinator must approve the collection mapping, planning-period boundaries, timezone, inferred role capacities, user-role normalization, and draft roster results. The final process should compare aggregate source/target counts and sample approved records without copying personal values into Capstone evidence.
 
-## Real member account migration (plan; not yet built)
+## Real member account migration (built: `scripts/bulk-provision-members.mjs`)
 
 This is narrower than the full event/roster migration above, and addresses a
 more immediate need: once Google sign-in (UI-01) is live, a real member
 should never have to be manually registered one at a time, and should never
 see a "not registered" screen the first time they sign in with their real
-email.
+email. It also seeds each member's role capabilities (instruments), since
+the `roles` reference table has no other source of real data — nothing else
+in the app creates role rows, so without this step every member (and the
+member-management screen) would show zero role capabilities regardless of
+how their account was created.
 
 Account linking (`docs/authentication-and-authorization.md#account-provisioning`)
-already supports this by design — an administrator pre-provisions a
-"pending" row by email (`POST /api/v1/users`), and it links automatically
-on that email's first Google sign-in. Migrating real members is therefore
-**bulk pre-provisioning**, not a new mechanism:
+already supports the account half of this by design — an administrator
+pre-provisions a "pending" row by email (`POST /api/v1/users`), and it links
+automatically on that email's first Google sign-in. Migrating real members is
+therefore **bulk pre-provisioning plus role-capability seeding**, not a new
+mechanism:
 
 1. An authorized coordinator exports the real member list (email, display
-   name, role) from the legacy system into a local file. That file must
-   never enter this repository, CI, or any AI conversation — the same
-   safety boundary already enforced for the spike above.
+   name, role, `primaryInstrument`, `secondaryInstruments`) from the legacy
+   system into a local file. That file must never enter this repository, CI,
+   or any AI conversation — the same safety boundary already enforced for
+   the spike above.
 2. Map legacy roles to `systemRole` using the mapping already established
    for the spike: `admin` → `administrator`, `*-leader` → `team_leader`,
    otherwise → `volunteer`.
-3. Deduplicate by email (case-insensitive). Rows with no email or a
-   malformed email cannot be auto-linked and need a separate manual-invite
-   plan once an email is available for them.
-4. Run a bulk-provisioning script (to be written when this moves from plan
-   to build) that authenticates as an administrator and calls
-   `POST /api/v1/users` once per row — reusing the same validated path a
-   single manual invite already goes through, rather than writing directly
-   to the database. Treat `409 email_already_registered` as an expected
-   "already provisioned" skip, not a failure. The script's output must be
-   counts only (created/skipped/failed) — never personal data — in
-   anything that could leave the operator's machine.
-5. Each member signs in once with Google using that email; the existing
+3. Normalize `primaryInstrument`/`secondaryInstruments` into role
+   capabilities the same way the full spike does: each instrument name
+   becomes a `roles` row (slug derived from the name) with `primary`/
+   `secondary` proficiency. A role slug that doesn't exist yet is created
+   via `POST /api/v1/roles`, reusing the validated path rather than writing
+   to the database directly.
+4. Deduplicate by email (case-insensitive). Rows with no email or a
+   malformed email cannot be auto-linked and are reported by row position
+   only — never by the email or name itself — so the output stays safe to
+   share for debugging.
+5. `scripts/bulk-provision-members.mjs <export-file-path>` runs the above:
+   it authenticates as an administrator (via `ADMIN_EMAIL` + Firebase Admin
+   custom-token minting, exchanged for an ID token), calls
+   `POST /api/v1/users` once per row, and `PUT /api/v1/users/{id}/roles` to
+   set that member's capabilities. `409 email_already_registered` is an
+   expected "already provisioned" skip, not a failure — and role
+   capabilities are still synced for a skipped (already-registered) member,
+   using the existing `GET /api/v1/users` listing to find their id, so
+   re-running the script safely keeps capabilities in sync too. All
+   console output is counts only (created/skipped/failed/roles created) —
+   never personal data.
+6. Each member signs in once with Google using that email; the existing
    auto-link claims the row. No re-registration step for them beyond a
    normal sign-in.
-6. Optional: notify members their account is ready via the existing
+7. Optional: notify members their account is ready via the existing
    `EmailSender`/Resend integration (US-09) once a "welcome" template
    exists. Not required — the church could announce it directly instead.
 

@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "driz
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type {
   AvailabilityInput,
+  CreateRoleInput,
   DateRange,
   DomainRepository,
   GeneratedCandidateDraft,
@@ -105,6 +106,40 @@ export function createDomainRepository(
 
     async listRoles() {
       return database.select().from(roles).orderBy(asc(roles.name));
+    },
+
+    async createRole(input: CreateRoleInput, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: roles.id })
+          .from(roles)
+          .where(eq(roles.slug, input.slug))
+          .limit(1);
+        if (existing) {
+          throw new ApiError("role_slug_already_exists", 409, "A role with this slug already exists");
+        }
+        const [role] = await transaction
+          .insert(roles)
+          .values({
+            slug: input.slug,
+            name: input.name,
+            description: input.description ?? null,
+          })
+          .returning({
+            id: roles.id,
+            slug: roles.slug,
+            name: roles.name,
+            description: roles.description,
+          });
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "role.created",
+          entityType: "role",
+          entityId: role.id,
+          metadata: { slug: input.slug },
+        });
+        return role;
+      });
     },
 
     async createPendingUser(input: PendingUserInput, actorUserId: string) {

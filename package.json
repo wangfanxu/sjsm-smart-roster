@@ -18,6 +18,7 @@
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
     "migration:legacy-spike": "node scripts/legacy-migration-spike.mjs",
+    "provision:members": "node scripts/bulk-provision-members.mjs",
     "assistant:eval": "node scripts/assistant-eval.mjs"
   },
   "dependencies": {

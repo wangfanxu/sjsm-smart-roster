@@ -10,6 +10,7 @@ function repositoryStub(): DomainRepository {
     getPlanningPeriod: vi.fn(),
     createService: vi.fn(),
     listRoles: vi.fn(),
+    createRole: vi.fn(),
     createPendingUser: vi.fn(),
     listUsersWithRoles: vi.fn(),
     replaceMemberRoles: vi.fn(),
@@ -294,6 +295,25 @@ describe("SmartRosterService", () => {
       service.publishCandidate("period", "candidate", { userId: "administrator" }),
     ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
     expect(repository.publishRosterCandidate).not.toHaveBeenCalled();
+  });
+
+  it("delegates role creation to the repository with the authenticated administrator", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.createRole).mockResolvedValue({
+      id: "role-1",
+      slug: "drummer",
+      name: "Drummer",
+      description: null,
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.createRole({ slug: "drummer", name: "Drummer" }, { userId: "administrator" }),
+    ).resolves.toEqual({ id: "role-1", slug: "drummer", name: "Drummer", description: null });
+    expect(repository.createRole).toHaveBeenCalledWith(
+      { slug: "drummer", name: "Drummer" },
+      "administrator",
+    );
   });
 
   it("delegates listing users with their roles to the repository", async () => {

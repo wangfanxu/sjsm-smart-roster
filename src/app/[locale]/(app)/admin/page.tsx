@@ -1,17 +1,17 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { isLocale, getMessages, type Locale } from "@/i18n/config";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { isLocale, type Locale } from "@/i18n/config";
 
 export default function AdminPage() {
   const params = useParams<{ locale: string }>();
   const locale: Locale = isLocale(params.locale) ? params.locale : "en";
-  const messages = getMessages(locale);
+  const router = useRouter();
 
-  return (
-    <section className="placeholder-panel">
-      <h1>{messages.navAdmin}</h1>
-      <p>{messages.comingSoon}</p>
-    </section>
-  );
+  useEffect(() => {
+    router.replace(`/${locale}/admin/periods`);
+  }, [locale, router]);
+
+  return null;
 }

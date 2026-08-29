@@ -84,6 +84,10 @@ export class SmartRosterService {
     return this.repository.createPendingUser(input, actor.userId);
   }
 
+  listUsers() {
+    return this.repository.listUsersWithRoles();
+  }
+
   replaceMemberRoles(userId: string, capabilities: MemberRoleInput, actor: Actor) {
     return this.repository.replaceMemberRoles(userId, capabilities, actor.userId);
   }

@@ -119,3 +119,22 @@ export type GenerationWeights = Readonly<{
   preferredAvailability?: number;
   loadBalance?: number;
 }>;
+
+export type SystemRole = "volunteer" | "team_leader" | "administrator";
+
+export type Proficiency = "primary" | "secondary";
+
+export type MemberRoleCapability = Readonly<{
+  roleId: string;
+  roleName: string;
+  proficiency: Proficiency;
+}>;
+
+export type MemberUser = Readonly<{
+  id: string;
+  email: string;
+  displayName: string;
+  systemRole: SystemRole;
+  isActive: boolean;
+  roles: ReadonlyArray<MemberRoleCapability>;
+}>;

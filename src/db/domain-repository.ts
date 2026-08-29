@@ -11,6 +11,7 @@ import type {
   PlanningPeriodInput,
   RosterGenerationSource,
   ServiceInput,
+  UserWithRoles,
 } from "@/domain/types";
 import * as schema from "./schema";
 import {
@@ -138,6 +139,38 @@ export function createDomainRepository(
         });
         return user;
       });
+    },
+
+    async listUsersWithRoles() {
+      const userRows = await database
+        .select({
+          id: users.id,
+          email: users.email,
+          displayName: users.displayName,
+          systemRole: users.systemRole,
+          isActive: users.isActive,
+        })
+        .from(users)
+        .orderBy(asc(users.displayName));
+
+      const roleRows = await database
+        .select({
+          userId: userRoles.userId,
+          roleId: userRoles.roleId,
+          roleName: roles.name,
+          proficiency: userRoles.proficiency,
+        })
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id));
+
+      const rolesByUser = new Map<string, UserWithRoles["roles"][number][]>();
+      for (const row of roleRows) {
+        const list = rolesByUser.get(row.userId) ?? [];
+        list.push({ roleId: row.roleId, roleName: row.roleName, proficiency: row.proficiency });
+        rolesByUser.set(row.userId, list);
+      }
+
+      return userRows.map((user) => ({ ...user, roles: rolesByUser.get(user.id) ?? [] }));
     },
 
     async replaceMemberRoles(userId: string, capabilities: MemberRoleInput, actorUserId: string) {

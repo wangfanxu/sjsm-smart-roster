@@ -165,6 +165,59 @@ export type AdminMessages = {
   apiErrorPlanningPeriodNotFound: string;
   apiErrorNoServiceRequirements: string;
   apiErrorNetwork: string;
+  apiErrorEmailAlreadyRegistered: string;
+  apiErrorUserNotFound: string;
+
+  // Admin hub
+  hubHeading: string;
+  hubIntro: string;
+  hubPeriodsTitle: string;
+  hubPeriodsDescription: string;
+  hubPeriodsLink: string;
+  hubMembersTitle: string;
+  hubMembersDescription: string;
+  hubMembersLink: string;
+
+  // Member management
+  membersHeading: string;
+  membersIntro: string;
+  membersEmpty: string;
+  membersLoadError: string;
+  memberColumnName: string;
+  memberColumnEmail: string;
+  memberColumnSystemRole: string;
+  memberColumnStatus: string;
+  memberColumnRoles: string;
+  memberColumnActions: string;
+  manageRolesButton: string;
+  memberActive: string;
+  memberInactive: string;
+  noRolesAssigned: string;
+  systemRoleVolunteer: string;
+  systemRoleTeamLeader: string;
+  systemRoleAdministrator: string;
+
+  inviteMemberHeading: string;
+  inviteMemberIntro: string;
+  fieldEmail: string;
+  fieldDisplayName: string;
+  fieldSystemRole: string;
+  inviteMemberSubmit: string;
+  invitingMember: string;
+  memberInvited: string;
+  emailRequired: string;
+  memberDisplayNameRequired: string;
+  emailAlreadyRegistered: string;
+
+  manageRolesHeading: string;
+  manageRolesIntro: string;
+  roleCapabilityNone: string;
+  roleCapabilityPrimary: string;
+  roleCapabilitySecondary: string;
+  saveRolesSubmit: string;
+  savingRoles: string;
+  rolesUpdated: string;
+  closeRolesEditor: string;
 };
 
 const messages: Record<Locale, AdminMessages> = {
@@ -334,6 +387,57 @@ const messages: Record<Locale, AdminMessages> = {
     apiErrorPlanningPeriodNotFound: "This planning period could not be found.",
     apiErrorNoServiceRequirements: "Add services with role requirements before generating a candidate.",
     apiErrorNetwork: "Could not reach the server. Check your connection and try again.",
+    apiErrorEmailAlreadyRegistered: "A member with this email is already registered.",
+    apiErrorUserNotFound: "This member could not be found.",
+
+    hubHeading: "Admin",
+    hubIntro: "Manage planning periods and rosters, or manage member accounts and role capabilities.",
+    hubPeriodsTitle: "Periods",
+    hubPeriodsDescription: "Create planning periods, add services, and generate roster candidates.",
+    hubPeriodsLink: "Go to periods",
+    hubMembersTitle: "Members",
+    hubMembersDescription: "Invite members and set their role capabilities.",
+    hubMembersLink: "Go to members",
+
+    membersHeading: "Members",
+    membersIntro: "Invite new members and manage each member's role capabilities.",
+    membersEmpty: "No members yet. Invite the first one below.",
+    membersLoadError: "Could not load members.",
+    memberColumnName: "Name",
+    memberColumnEmail: "Email",
+    memberColumnSystemRole: "System role",
+    memberColumnStatus: "Status",
+    memberColumnRoles: "Role capabilities",
+    memberColumnActions: "Actions",
+    manageRolesButton: "Manage roles",
+    memberActive: "Active",
+    memberInactive: "Inactive",
+    noRolesAssigned: "No role capabilities set",
+    systemRoleVolunteer: "Volunteer",
+    systemRoleTeamLeader: "Team leader",
+    systemRoleAdministrator: "Administrator",
+
+    inviteMemberHeading: "Invite a member",
+    inviteMemberIntro: "Creates a pending account. The member links it automatically on their first sign-in.",
+    fieldEmail: "Email",
+    fieldDisplayName: "Display name",
+    fieldSystemRole: "System role",
+    inviteMemberSubmit: "Invite member",
+    invitingMember: "Inviting…",
+    memberInvited: "Member invited.",
+    emailRequired: "Enter a valid email address.",
+    memberDisplayNameRequired: "Enter a display name up to 160 characters.",
+    emailAlreadyRegistered: "A member with this email is already registered.",
+
+    manageRolesHeading: "Role capabilities for {name}",
+    manageRolesIntro: "Set each role to primary, secondary, or not assigned, then save.",
+    roleCapabilityNone: "Not assigned",
+    roleCapabilityPrimary: "Primary",
+    roleCapabilitySecondary: "Secondary",
+    saveRolesSubmit: "Save role capabilities",
+    savingRoles: "Saving…",
+    rolesUpdated: "Role capabilities updated.",
+    closeRolesEditor: "Close",
   },
   zh: {
     loading: "加载中……",
@@ -498,6 +602,57 @@ const messages: Record<Locale, AdminMessages> = {
     apiErrorPlanningPeriodNotFound: "找不到此排班周期。",
     apiErrorNoServiceRequirements: "请先添加带有角色需求的服务，再生成候选排班表。",
     apiErrorNetwork: "无法连接服务器，请检查网络后重试。",
+    apiErrorEmailAlreadyRegistered: "已有成员使用此邮箱注册。",
+    apiErrorUserNotFound: "找不到此成员。",
+
+    hubHeading: "管理",
+    hubIntro: "管理排班周期与排班表，或管理成员账户与角色能力。",
+    hubPeriodsTitle: "排班周期",
+    hubPeriodsDescription: "创建排班周期、添加服务并生成候选排班表。",
+    hubPeriodsLink: "前往排班周期",
+    hubMembersTitle: "成员",
+    hubMembersDescription: "邀请成员并设置其角色能力。",
+    hubMembersLink: "前往成员管理",
+
+    membersHeading: "成员",
+    membersIntro: "邀请新成员并管理每位成员的角色能力。",
+    membersEmpty: "还没有成员，请在下方邀请第一位。",
+    membersLoadError: "无法加载成员列表。",
+    memberColumnName: "姓名",
+    memberColumnEmail: "邮箱",
+    memberColumnSystemRole: "系统角色",
+    memberColumnStatus: "状态",
+    memberColumnRoles: "角色能力",
+    memberColumnActions: "操作",
+    manageRolesButton: "管理角色",
+    memberActive: "活跃",
+    memberInactive: "非活跃",
+    noRolesAssigned: "尚未设置角色能力",
+    systemRoleVolunteer: "志愿者",
+    systemRoleTeamLeader: "小组负责人",
+    systemRoleAdministrator: "管理员",
+
+    inviteMemberHeading: "邀请成员",
+    inviteMemberIntro: "将创建待激活账户，成员首次登录时会自动关联。",
+    fieldEmail: "邮箱",
+    fieldDisplayName: "显示名称",
+    fieldSystemRole: "系统角色",
+    inviteMemberSubmit: "邀请成员",
+    invitingMember: "邀请中……",
+    memberInvited: "成员已邀请。",
+    emailRequired: "请输入有效的邮箱地址。",
+    memberDisplayNameRequired: "请输入显示名称（最多160个字符）。",
+    emailAlreadyRegistered: "已有成员使用此邮箱注册。",
+
+    manageRolesHeading: "{name} 的角色能力",
+    manageRolesIntro: "为每个角色选择主要、次要或不分配，然后保存。",
+    roleCapabilityNone: "不分配",
+    roleCapabilityPrimary: "主要",
+    roleCapabilitySecondary: "次要",
+    saveRolesSubmit: "保存角色能力",
+    savingRoles: "保存中……",
+    rolesUpdated: "角色能力已更新。",
+    closeRolesEditor: "关闭",
   },
 };
 
@@ -516,6 +671,8 @@ const apiErrorKeyMap: Record<string, keyof AdminMessages> = {
   planning_period_not_found: "apiErrorPlanningPeriodNotFound",
   no_service_requirements: "apiErrorNoServiceRequirements",
   service_outside_planning_period: "serviceOutOfRange",
+  email_already_registered: "apiErrorEmailAlreadyRegistered",
+  user_not_found: "apiErrorUserNotFound",
 };
 
 export function describeApiErrorCode(code: string, messagesForLocale: AdminMessages): string {

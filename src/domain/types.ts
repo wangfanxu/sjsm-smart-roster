@@ -24,6 +24,17 @@ export type PendingUserInput = Readonly<{
   systemRole: "volunteer" | "team_leader" | "administrator";
 }>;
 
+export type UserWithRoles = Readonly<{
+  id: string;
+  email: string;
+  displayName: string;
+  systemRole: "volunteer" | "team_leader" | "administrator";
+  isActive: boolean;
+  roles: ReadonlyArray<
+    Readonly<{ roleId: string; roleName: string; proficiency: "primary" | "secondary" }>
+  >;
+}>;
+
 export type AvailabilityInput = Readonly<{
   serviceDate: string;
   status: "available" | "unavailable" | "preferred";
@@ -167,6 +178,7 @@ export interface DomainRepository {
     input: PendingUserInput,
     actorUserId: string,
   ): Promise<{ id: string; email: string; displayName: string; systemRole: string }>;
+  listUsersWithRoles(): Promise<UserWithRoles[]>;
   replaceMemberRoles(
     userId: string,
     capabilities: MemberRoleInput,

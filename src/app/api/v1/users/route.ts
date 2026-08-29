@@ -16,6 +16,20 @@ export async function handleUsersPost(request: Request, dependencies: ApiDepende
   }
 }
 
+export async function handleUsersGet(request: Request, dependencies: ApiDependencies) {
+  try {
+    await authorizeRequest(request, "user:manage", dependencies.auth);
+    const users = await dependencies.service.listUsers();
+    return Response.json({ users });
+  } catch (error) {
+    return apiErrorResponse(error);
+  }
+}
+
 export function POST(request: Request) {
   return handleUsersPost(request, getServerApiDependencies());
+}
+
+export function GET(request: Request) {
+  return handleUsersGet(request, getServerApiDependencies());
 }

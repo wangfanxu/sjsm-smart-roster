@@ -41,7 +41,22 @@ These steps change cloud resources and may enable billing. Perform them from the
    DATABASE_URL='<direct-neon-url>' npm run db:migrate
    ```
 
-8. Trigger or wait for the `main` rollout. Record the URL, commit SHA, rollout result, and verification output in the deployment evidence section below.
+8. Add the conversational assistant's runtime secrets the same way (see
+   [ADR 0003](adr/0003-use-gemini-flash-lite-for-assistant-classification.md)
+   before putting real member data through the assistant — the free Gemini
+   tier is demo-only):
+
+   ```bash
+   firebase apphosting:secrets:set sjsm-smart-roster-gemini-api-key
+   firebase apphosting:secrets:set sjsm-smart-roster-assistant-confirmation-secret
+   ```
+
+   Use a Gemini API key from Google AI Studio for the first, and a long
+   random value (e.g. `openssl rand -base64 32`) for the second — it signs
+   confirmation tokens for conversational availability writes, not an
+   external credential. `ASSISTANT_MODEL` is not sensitive and is set as a
+   plain value in `apphosting.yaml`.
+9. Trigger or wait for the `main` rollout. Record the URL, commit SHA, rollout result, and verification output in the deployment evidence section below.
 
 Firebase App Hosting automatically supplies Firebase project configuration and Google Application Default Credentials. Do not create or upload a service-account key for the application.
 

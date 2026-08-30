@@ -46,6 +46,7 @@ export function AppShell({
         </div>
         <div className="app-nav-links">
           <Link href={`/${locale}/dashboard`}>{messages.navDashboard}</Link>
+          <Link href={`/${locale}/profile`}>{messages.navProfile}</Link>
           <Link href={`/${locale}/assistant`}>{messages.navAssistant}</Link>
           {profile.systemRole === "administrator" ? (
             <Link href={`/${locale}/admin`}>{messages.navAdmin}</Link>

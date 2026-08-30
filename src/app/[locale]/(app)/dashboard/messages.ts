@@ -15,6 +15,7 @@ export type DashboardMessages = {
   assignmentsColumnWhen: string;
   assignmentsColumnTitle: string;
   assignmentsColumnRole: string;
+  assignmentsTeammatesTitle: string;
 
   availabilityTitle: string;
   availabilityDescription: string;
@@ -54,6 +55,7 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnWhen: "When",
     assignmentsColumnTitle: "Service",
     assignmentsColumnRole: "Role",
+    assignmentsTeammatesTitle: "Team members",
 
     availabilityTitle: "Availability",
     availabilityDescription:
@@ -95,6 +97,7 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnWhen: "时间",
     assignmentsColumnTitle: "服侍",
     assignmentsColumnRole: "角色",
+    assignmentsTeammatesTitle: "组员",
 
     availabilityTitle: "可用时间",
     availabilityDescription: "告诉团队你哪些日期方便服侍。在日期到来之前，你可以随时更新。",

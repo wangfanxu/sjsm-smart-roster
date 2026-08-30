@@ -250,6 +250,9 @@ export interface DomainRepository {
       role: string;
     }>
   >;
+  listServiceTeammates(serviceIds: ReadonlyArray<string>): Promise<
+    Array<{ serviceId: string; userId: string; displayName: string; roleName: string }>
+  >;
   listEligibleUsersForServiceRole(
     serviceId: string,
     roleId: string,

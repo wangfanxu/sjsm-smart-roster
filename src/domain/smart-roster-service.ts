@@ -150,6 +150,16 @@ export class SmartRosterService {
       throw new ApiError("invalid_date_range", 400, "to must be after from");
     }
     const assignments = await this.repository.listUpcomingAssignments(userId, effectiveFrom, to);
+    const serviceIds = [...new Set(assignments.map((assignment) => assignment.serviceId))];
+    const teammates = await this.repository.listServiceTeammates(serviceIds);
+    const teammatesByService = new Map<string, Array<{ userId: string; displayName: string; role: string }>>();
+    for (const teammate of teammates) {
+      if (teammate.userId === userId) continue;
+      const list = teammatesByService.get(teammate.serviceId) ?? [];
+      list.push({ userId: teammate.userId, displayName: teammate.displayName, role: teammate.roleName });
+      teammatesByService.set(teammate.serviceId, list);
+    }
+
     return assignments.map((assignment) => ({
       ...assignment,
       startsAt: assignment.startsAt.toISOString(),
@@ -160,6 +170,7 @@ export class SmartRosterService {
         minute: "2-digit",
         hour12: false,
       }).format(assignment.startsAt),
+      teammates: teammatesByService.get(assignment.serviceId) ?? [],
     }));
   }
 

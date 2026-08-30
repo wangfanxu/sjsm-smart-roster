@@ -6,6 +6,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import styles from "./dashboard.module.css";
 import { formatServiceDateTime, sortAssignmentsChronologically } from "./date-utils";
 import { getDashboardMessages } from "./messages";
+import { groupTeammatesByRole } from "./teammates-utils";
 import type { Assignment } from "./types";
 
 type AssignmentsState =
@@ -77,17 +78,28 @@ export function AssignmentsSection({
 
       {state.status === "ready" && state.assignments.length > 0 ? (
         <ul className={styles.assignmentList}>
-          {state.assignments.map((assignment) => (
-            <li key={assignment.assignmentId} className={styles.assignmentCard}>
-              <span className={styles.assignmentWhen}>
-                {formatServiceDateTime(assignment.serviceDate, assignment.serviceTime, locale)}
-              </span>
-              <span className={styles.assignmentTitle}>{assignment.title}</span>
-              <span className={styles.assignmentRole} aria-label={messages.assignmentsRoleLabel}>
-                {assignment.role}
-              </span>
-            </li>
-          ))}
+          {state.assignments.map((assignment) => {
+            const teammateGroups = groupTeammatesByRole(assignment.teammates);
+            return (
+              <li key={assignment.assignmentId} className={styles.assignmentCard}>
+                <span className={styles.assignmentWhen}>
+                  {formatServiceDateTime(assignment.serviceDate, assignment.serviceTime, locale)}
+                </span>
+                <span className={styles.assignmentTitle}>{assignment.title}</span>
+                <span className={styles.assignmentRole} aria-label={messages.assignmentsRoleLabel}>
+                  {assignment.role}
+                </span>
+                {teammateGroups.length > 0 ? (
+                  <span className={styles.assignmentTeammates}>
+                    <strong>{messages.assignmentsTeammatesTitle}: </strong>
+                    {teammateGroups
+                      .map((group) => `${group.role} — ${group.names.join(", ")}`)
+                      .join(" · ")}
+                  </span>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </section>

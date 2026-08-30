@@ -1,3 +1,9 @@
+export type Teammate = Readonly<{
+  userId: string;
+  displayName: string;
+  role: string;
+}>;
+
 export type Assignment = Readonly<{
   assignmentId: string;
   serviceId: string;
@@ -6,6 +12,7 @@ export type Assignment = Readonly<{
   serviceTime: string;
   title: string;
   role: string;
+  teammates: ReadonlyArray<Teammate>;
 }>;
 
 export type AvailabilityStatus = "available" | "unavailable" | "preferred";

@@ -203,6 +203,12 @@ export type NotificationDelivery = Readonly<{
 export interface DomainRepository {
   listPlanningPeriods(): Promise<unknown[]>;
   createPlanningPeriod(input: PlanningPeriodInput, actorUserId: string): Promise<unknown>;
+  updatePlanningPeriod(
+    planningPeriodId: string,
+    input: PlanningPeriodInput,
+    actorUserId: string,
+  ): Promise<unknown>;
+  deletePlanningPeriod(planningPeriodId: string, actorUserId: string): Promise<{ id: string }>;
   listServices(planningPeriodId: string): Promise<ServiceWithRequirements[]>;
   getPlanningPeriod(planningPeriodId: string): Promise<{
     id: string;

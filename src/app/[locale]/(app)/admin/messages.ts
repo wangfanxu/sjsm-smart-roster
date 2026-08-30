@@ -27,6 +27,22 @@ export type AdminMessages = {
   nameTooLong: string;
   datesRequired: string;
   endsBeforeStarts: string;
+  editPeriodButton: string;
+  deletePeriodButton: string;
+  editPeriodHeading: string;
+  editPeriodSubmit: string;
+  savingPeriodEdit: string;
+  periodUpdated: string;
+  closeEditPeriodDialog: string;
+  deletePeriodConfirmTitle: string;
+  deletePeriodConfirmBody: string;
+  deletePeriodConfirmConfirm: string;
+  deletePeriodConfirmCancel: string;
+  deletingPeriod: string;
+  periodDeleted: string;
+  periodActionError: string;
+  apiErrorPeriodHasPublishedRoster: string;
+  apiErrorPeriodShrinkExcludesServices: string;
 
   // Period detail
   periodDetailHeading: string;
@@ -287,6 +303,25 @@ const messages: Record<Locale, AdminMessages> = {
     nameTooLong: "Name must be 120 characters or fewer.",
     datesRequired: "Enter both a start and end date.",
     endsBeforeStarts: "End date must be on or after the start date.",
+    editPeriodButton: "Edit",
+    deletePeriodButton: "Delete",
+    editPeriodHeading: "Edit planning period",
+    editPeriodSubmit: "Save changes",
+    savingPeriodEdit: "Saving…",
+    periodUpdated: "Planning period updated.",
+    closeEditPeriodDialog: "Cancel",
+    deletePeriodConfirmTitle: "Delete this planning period?",
+    deletePeriodConfirmBody:
+      "This removes the planning period and every draft service, candidate, and assignment under it. This cannot be undone from this screen.",
+    deletePeriodConfirmConfirm: "Yes, delete",
+    deletePeriodConfirmCancel: "Cancel",
+    deletingPeriod: "Deleting…",
+    periodDeleted: "Planning period deleted.",
+    periodActionError: "Could not complete that action.",
+    apiErrorPeriodHasPublishedRoster:
+      "This planning period has a published roster and cannot be changed or deleted here.",
+    apiErrorPeriodShrinkExcludesServices:
+      "These dates would exclude an existing service - edit or remove it first.",
 
     periodDetailHeading: "Planning period",
     periodRange: "Runs from {startsOn} to {endsOn}",
@@ -548,6 +583,23 @@ const messages: Record<Locale, AdminMessages> = {
     nameTooLong: "名称不能超过120个字符。",
     datesRequired: "请输入开始和结束日期。",
     endsBeforeStarts: "结束日期必须晚于或等于开始日期。",
+    editPeriodButton: "编辑",
+    deletePeriodButton: "删除",
+    editPeriodHeading: "编辑排班周期",
+    editPeriodSubmit: "保存修改",
+    savingPeriodEdit: "保存中……",
+    periodUpdated: "排班周期已更新。",
+    closeEditPeriodDialog: "取消",
+    deletePeriodConfirmTitle: "确认删除此排班周期？",
+    deletePeriodConfirmBody:
+      "这将删除该排班周期及其下所有草稿状态的服务、候选排班表和分配，此操作在此页面上无法撤销。",
+    deletePeriodConfirmConfirm: "确认删除",
+    deletePeriodConfirmCancel: "取消",
+    deletingPeriod: "删除中……",
+    periodDeleted: "排班周期已删除。",
+    periodActionError: "无法完成此操作。",
+    apiErrorPeriodHasPublishedRoster: "该排班周期已有发布的排班表，无法在此修改或删除。",
+    apiErrorPeriodShrinkExcludesServices: "新的日期范围会排除已有的服务，请先编辑或删除该服务。",
 
     periodDetailHeading: "排班周期",
     periodRange: "从 {startsOn} 到 {endsOn}",
@@ -802,6 +854,8 @@ const apiErrorKeyMap: Record<string, keyof AdminMessages> = {
   assignment_not_found: "apiErrorAssignmentNotFound",
   service_not_found: "apiErrorServiceNotFound",
   service_has_published_assignments: "apiErrorServiceHasPublishedAssignments",
+  period_has_published_roster: "apiErrorPeriodHasPublishedRoster",
+  period_shrink_excludes_services: "apiErrorPeriodShrinkExcludesServices",
 };
 
 export function describeApiErrorCode(code: string, messagesForLocale: AdminMessages): string {

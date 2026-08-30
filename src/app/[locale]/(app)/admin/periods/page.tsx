@@ -5,12 +5,21 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { isLocale, type Locale } from "@/i18n/config";
 import { useAuth } from "@/lib/auth-client";
-import { createPlanningPeriod, createService, listPlanningPeriods, listRoles } from "../api";
+import {
+  createPlanningPeriod,
+  createService,
+  deletePlanningPeriod,
+  listPlanningPeriods,
+  listRoles,
+  updatePlanningPeriod,
+} from "../api";
+import { ConfirmDialog } from "../confirm-dialog";
 import { extractValidationFieldPaths, resolveApiErrorMessage } from "../errors";
 import { formatDate, saturdaysBetween, toSingaporeIsoString } from "../format";
 import { getAdminMessages, type AdminMessages } from "../messages";
 import {
   emptyRequirementRow,
+  nextRequirementRowKey,
   requirementsFieldError,
   requirementsPayload,
   RoleRequirementsEditor,
@@ -67,6 +76,15 @@ export default function PlanningPeriodsPage() {
       ]);
       setPeriods([...periodsResponse.planningPeriods]);
       setRoles([...rolesResponse.roles]);
+      setTemplateRows(
+        rolesResponse.roles.length > 0
+          ? rolesResponse.roles.map((role) => ({
+              key: nextRequirementRowKey(),
+              roleId: role.id,
+              requiredCount: "1",
+            }))
+          : [emptyRequirementRow()],
+      );
       setLoadState("ready");
     } catch {
       setLoadState("error");
@@ -156,6 +174,83 @@ export default function PlanningPeriodsPage() {
     }
   }
 
+  // --- Edit / delete planning period ---
+  const [periodActionError, setPeriodActionError] = useState<string | null>(null);
+  const [editPeriodTarget, setEditPeriodTarget] = useState<PlanningPeriod | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editStartsOn, setEditStartsOn] = useState("");
+  const [editEndsOn, setEditEndsOn] = useState("");
+  const [editPeriodFieldErrors, setEditPeriodFieldErrors] = useState<Record<string, string>>({});
+  const [editPeriodFormError, setEditPeriodFormError] = useState<string | null>(null);
+  const [savingPeriodEdit, setSavingPeriodEdit] = useState(false);
+
+  const [deletePeriodTarget, setDeletePeriodTarget] = useState<PlanningPeriod | null>(null);
+  const [deletingPeriod, setDeletingPeriod] = useState(false);
+
+  function openEditPeriodDialog(period: PlanningPeriod) {
+    setPeriodActionError(null);
+    setEditPeriodTarget(period);
+    setEditName(period.name);
+    setEditStartsOn(period.startsOn);
+    setEditEndsOn(period.endsOn);
+    setEditPeriodFieldErrors({});
+    setEditPeriodFormError(null);
+  }
+
+  function closeEditPeriodDialog() {
+    setEditPeriodTarget(null);
+  }
+
+  async function handleEditPeriodSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!idToken || !editPeriodTarget) return;
+    setEditPeriodFormError(null);
+
+    const errors: Record<string, string> = {};
+    const trimmedName = editName.trim();
+    if (!trimmedName || trimmedName.length > 120) errors.name = messages.nameRequired;
+    if (!editStartsOn || !editEndsOn) {
+      errors.dates = messages.datesRequired;
+    } else if (editStartsOn > editEndsOn) {
+      errors.endsOn = messages.endsBeforeStarts;
+    }
+    setEditPeriodFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    setSavingPeriodEdit(true);
+    try {
+      const { planningPeriod } = await updatePlanningPeriod(idToken, editPeriodTarget.id, {
+        name: trimmedName,
+        startsOn: editStartsOn,
+        endsOn: editEndsOn,
+      });
+      setPeriods((previous) =>
+        previous.map((existing) => (existing.id === planningPeriod.id ? planningPeriod : existing)),
+      );
+      setEditPeriodTarget(null);
+    } catch (error) {
+      setEditPeriodFormError(resolveApiErrorMessage(error, messages));
+    } finally {
+      setSavingPeriodEdit(false);
+    }
+  }
+
+  async function handleDeletePeriod() {
+    if (!idToken || !deletePeriodTarget) return;
+    setPeriodActionError(null);
+    setDeletingPeriod(true);
+    try {
+      await deletePlanningPeriod(idToken, deletePeriodTarget.id);
+      setPeriods((previous) => previous.filter((period) => period.id !== deletePeriodTarget.id));
+      setDeletePeriodTarget(null);
+    } catch (error) {
+      setPeriodActionError(resolveApiErrorMessage(error, messages));
+      setDeletePeriodTarget(null);
+    } finally {
+      setDeletingPeriod(false);
+    }
+  }
+
   return (
     <div className={styles.page}>
       <section className={styles.panel}>
@@ -170,6 +265,12 @@ export default function PlanningPeriodsPage() {
             <button type="button" className={styles.secondaryButton} onClick={retryLoadPeriods}>
               {messages.retry}
             </button>
+          </div>
+        ) : null}
+
+        {periodActionError ? (
+          <div className={styles.errorBanner} role="alert">
+            <p>{periodActionError}</p>
           </div>
         ) : null}
 
@@ -194,9 +295,25 @@ export default function PlanningPeriodsPage() {
                     {formatDate(period.startsOn, locale)} – {formatDate(period.endsOn, locale)}
                   </td>
                   <td>
-                    <Link className={styles.smallButton} href={`/${locale}/admin/periods/${period.id}`}>
-                      {messages.openPeriod}
-                    </Link>
+                    <div className={styles.actionsRow}>
+                      <Link className={styles.smallButton} href={`/${locale}/admin/periods/${period.id}`}>
+                        {messages.openPeriod}
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.smallButton}
+                        onClick={() => openEditPeriodDialog(period)}
+                      >
+                        {messages.editPeriodButton}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() => setDeletePeriodTarget(period)}
+                      >
+                        {messages.deletePeriodButton}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -307,6 +424,93 @@ export default function PlanningPeriodsPage() {
           </div>
         </form>
       </section>
+
+      {editPeriodTarget ? (
+        <div className={styles.dialogOverlay} role="presentation" onClick={closeEditPeriodDialog}>
+          <div
+            className={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-period-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="edit-period-heading" className={styles.panelHeading}>
+              {messages.editPeriodHeading}
+            </h2>
+            <form className={styles.form} onSubmit={(event) => void handleEditPeriodSubmit(event)}>
+              <div className={styles.field}>
+                <label htmlFor="edit-period-name">{messages.fieldName}</label>
+                <input
+                  id="edit-period-name"
+                  type="text"
+                  maxLength={120}
+                  value={editName}
+                  onChange={(event) => setEditName(event.target.value)}
+                />
+                {editPeriodFieldErrors.name ? (
+                  <p className={styles.fieldError}>{editPeriodFieldErrors.name}</p>
+                ) : null}
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="edit-period-starts-on">{messages.fieldStartsOn}</label>
+                <input
+                  id="edit-period-starts-on"
+                  type="date"
+                  value={editStartsOn}
+                  onChange={(event) => setEditStartsOn(event.target.value)}
+                />
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="edit-period-ends-on">{messages.fieldEndsOn}</label>
+                <input
+                  id="edit-period-ends-on"
+                  type="date"
+                  value={editEndsOn}
+                  onChange={(event) => setEditEndsOn(event.target.value)}
+                />
+                {editPeriodFieldErrors.endsOn ? (
+                  <p className={styles.fieldError}>{editPeriodFieldErrors.endsOn}</p>
+                ) : null}
+                {editPeriodFieldErrors.dates ? (
+                  <p className={styles.fieldError}>{editPeriodFieldErrors.dates}</p>
+                ) : null}
+              </div>
+
+              {editPeriodFormError ? (
+                <div className={styles.errorBanner} role="alert">
+                  <p>{editPeriodFormError}</p>
+                </div>
+              ) : null}
+
+              <div className={styles.actionsRow}>
+                <button type="submit" className={styles.primaryButton} disabled={savingPeriodEdit}>
+                  {savingPeriodEdit ? messages.savingPeriodEdit : messages.editPeriodSubmit}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={closeEditPeriodDialog}
+                  disabled={savingPeriodEdit}
+                >
+                  {messages.closeEditPeriodDialog}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deletePeriodTarget ? (
+        <ConfirmDialog
+          title={messages.deletePeriodConfirmTitle}
+          body={messages.deletePeriodConfirmBody}
+          confirmLabel={messages.deletePeriodConfirmConfirm}
+          cancelLabel={messages.deletePeriodConfirmCancel}
+          busy={deletingPeriod}
+          onConfirm={() => void handleDeletePeriod()}
+          onCancel={() => setDeletePeriodTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }

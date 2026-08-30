@@ -11,6 +11,10 @@ import {
 } from "@/app/api/v1/planning-periods/route";
 import { handleServicesPost } from "@/app/api/v1/planning-periods/[periodId]/services/route";
 import {
+  handleServiceDelete,
+  handleServicePatch,
+} from "@/app/api/v1/planning-periods/[periodId]/services/[serviceId]/route";
+import {
   handleCandidatesGet,
   handleCandidatesPost,
 } from "@/app/api/v1/planning-periods/[periodId]/candidates/route";
@@ -248,6 +252,102 @@ describe("Sprint 1 protected API flow", () => {
       WHERE actor_user_id = '${adminId}'
     `);
     expect(audit.rows[0].count).toBe(3);
+  });
+
+  async function createServiceInFreshPeriod() {
+    const adminDependencies = dependencies("firebase-admin");
+    const periodResponse = await handlePlanningPeriodsPost(
+      request("/api/v1/planning-periods", {
+        method: "POST",
+        body: JSON.stringify({ name: "Spring", startsOn: "2027-01-01", endsOn: "2027-02-28" }),
+      }),
+      adminDependencies,
+    );
+    const { planningPeriod } = (await periodResponse.json()) as { planningPeriod: { id: string } };
+
+    const serviceResponse = await handleServicesPost(
+      request(`/api/v1/planning-periods/${planningPeriod.id}/services`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Spring Service",
+          startsAt: "2027-01-09T09:00:00+08:00",
+          requirements: [{ roleId: drummerRoleId, requiredCount: 1 }],
+        }),
+      }),
+      { params: Promise.resolve({ periodId: planningPeriod.id }) },
+      adminDependencies,
+    );
+    const { service } = (await serviceResponse.json()) as { service: { id: string } };
+    return { periodId: planningPeriod.id, serviceId: service.id };
+  }
+
+  it("edits a service that has no published assignments", async () => {
+    const { periodId: freshPeriodId, serviceId } = await createServiceInFreshPeriod();
+
+    const response = await handleServicePatch(
+      request(`/api/v1/planning-periods/${freshPeriodId}/services/${serviceId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Spring Service (Updated)",
+          startsAt: "2027-01-09T15:00:00+08:00",
+          requirements: [{ roleId: drummerRoleId, requiredCount: 2 }],
+        }),
+      }),
+      { params: Promise.resolve({ periodId: freshPeriodId, serviceId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as {
+      service: { id: string; title: string; requirements: Array<{ roleId: string; requiredCount: number }> };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.service.title).toBe("Spring Service (Updated)");
+    expect(body.service.requirements).toEqual([{ roleId: drummerRoleId, roleName: "Drummer", requiredCount: 2 }]);
+  });
+
+  it("deletes a service that has no published assignments", async () => {
+    const { periodId: freshPeriodId, serviceId } = await createServiceInFreshPeriod();
+
+    const response = await handleServiceDelete(
+      request(`/api/v1/planning-periods/${freshPeriodId}/services/${serviceId}`, { method: "DELETE" }),
+      { params: Promise.resolve({ periodId: freshPeriodId, serviceId }) },
+      dependencies("firebase-admin"),
+    );
+
+    expect(response.status).toBe(200);
+    const row = await pglite.query(`SELECT id FROM services WHERE id = '${serviceId}'`);
+    expect(row.rows).toHaveLength(0);
+  });
+
+  it("rejects editing a service that has assignments on a published roster", async () => {
+    const response = await handleServicePatch(
+      request(`/api/v1/planning-periods/${periodId}/services/${firstServiceId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Should not apply",
+          startsAt: "2026-09-05T09:00:00+08:00",
+          requirements: [{ roleId: drummerRoleId, requiredCount: 1 }],
+        }),
+      }),
+      { params: Promise.resolve({ periodId, serviceId: firstServiceId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("service_has_published_assignments");
+  });
+
+  it("rejects deleting a service that has assignments on a published roster", async () => {
+    const response = await handleServiceDelete(
+      request(`/api/v1/planning-periods/${periodId}/services/${firstServiceId}`, { method: "DELETE" }),
+      { params: Promise.resolve({ periodId, serviceId: firstServiceId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("service_has_published_assignments");
   });
 
   it("denies planning writes to volunteers", async () => {

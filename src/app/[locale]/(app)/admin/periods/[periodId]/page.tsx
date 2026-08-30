@@ -7,28 +7,31 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { useAuth } from "@/lib/auth-client";
 import {
   createService,
+  deleteService,
   generateCandidate,
   listCandidates,
   listPlanningPeriods,
   listRoles,
   listServices,
+  updateService,
 } from "../../api";
+import { ConfirmDialog } from "../../confirm-dialog";
 import { extractValidationFieldPaths, resolveApiErrorMessage } from "../../errors";
-import { formatDate, formatDateTime, toSingaporeIsoString } from "../../format";
+import { formatDate, formatDateTime, splitSingaporeIsoString, toSingaporeIsoString } from "../../format";
 import { formatMessage, getAdminMessages } from "../../messages";
+import {
+  emptyRequirementRow,
+  nextRequirementRowKey,
+  requirementsFieldError,
+  requirementsPayload,
+  RoleRequirementsEditor,
+  type RequirementRow,
+} from "../../role-requirements-editor";
 import { StatusBadge } from "../../status-badge";
 import styles from "../../admin.module.css";
 import type { CandidateSummary, PlanningPeriod, Role, Service } from "../../types";
 
 type LoadState = "loading" | "ready" | "error";
-
-type RequirementRow = Readonly<{ key: string; roleId: string; requiredCount: string }>;
-
-let requirementRowKeySeed = 0;
-function nextRequirementRowKey(): string {
-  requirementRowKeySeed += 1;
-  return `requirement-${requirementRowKeySeed}`;
-}
 
 export default function PlanningPeriodDetailPage() {
   const params = useParams<{ locale: string; periodId: string }>();
@@ -82,25 +85,11 @@ export default function PlanningPeriodDetailPage() {
   const [serviceDate, setServiceDate] = useState("");
   const [serviceTime, setServiceTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [requirementRows, setRequirementRows] = useState<RequirementRow[]>([
-    { key: nextRequirementRowKey(), roleId: "", requiredCount: "1" },
-  ]);
+  const [requirementRows, setRequirementRows] = useState<RequirementRow[]>([emptyRequirementRow()]);
   const [serviceFieldErrors, setServiceFieldErrors] = useState<Record<string, string>>({});
   const [serviceFormError, setServiceFormError] = useState<string | null>(null);
   const [serviceSuccess, setServiceSuccess] = useState(false);
   const [creatingService, setCreatingService] = useState(false);
-
-  function updateRequirementRow(key: string, patch: Partial<RequirementRow>) {
-    setRequirementRows((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
-  }
-
-  function addRequirementRow() {
-    setRequirementRows((rows) => [...rows, { key: nextRequirementRowKey(), roleId: "", requiredCount: "1" }]);
-  }
-
-  function removeRequirementRow(key: string) {
-    setRequirementRows((rows) => (rows.length > 1 ? rows.filter((row) => row.key !== key) : rows));
-  }
 
   function validateServiceForm(): Record<string, string> {
     const errors: Record<string, string> = {};
@@ -111,24 +100,8 @@ export default function PlanningPeriodDetailPage() {
     if (!serviceDate || !serviceTime) {
       errors.startsAt = messages.serviceDateTimeRequired;
     }
-    const seenRoles = new Set<string>();
-    let duplicate = false;
-    let outOfRange = false;
-    for (const row of requirementRows) {
-      if (!row.roleId) continue;
-      if (seenRoles.has(row.roleId)) duplicate = true;
-      seenRoles.add(row.roleId);
-      const count = Number(row.requiredCount);
-      if (!Number.isInteger(count) || count < 1 || count > 20) outOfRange = true;
-    }
-    const populatedRows = requirementRows.filter((row) => row.roleId);
-    if (populatedRows.length === 0) {
-      errors.requirements = messages.requirementsRequired;
-    } else if (duplicate) {
-      errors.requirements = messages.duplicateRole;
-    } else if (outOfRange) {
-      errors.requirements = messages.requiredCountRange;
-    }
+    const requirementsError = requirementsFieldError(requirementRows, messages);
+    if (requirementsError) errors.requirements = requirementsError;
     return errors;
   }
 
@@ -153,9 +126,7 @@ export default function PlanningPeriodDetailPage() {
         title: title.trim(),
         startsAt,
         notes: notes.trim() ? notes.trim() : null,
-        requirements: requirementRows
-          .filter((row) => row.roleId)
-          .map((row) => ({ roleId: row.roleId, requiredCount: Number(row.requiredCount) })),
+        requirements: requirementsPayload(requirementRows),
       });
       setServices((previous) =>
         [...previous, service].sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
@@ -164,7 +135,7 @@ export default function PlanningPeriodDetailPage() {
       setServiceDate("");
       setServiceTime("");
       setNotes("");
-      setRequirementRows([{ key: nextRequirementRowKey(), roleId: "", requiredCount: "1" }]);
+      setRequirementRows([emptyRequirementRow()]);
       setServiceSuccess(true);
     } catch (error) {
       const paths = extractValidationFieldPaths(error);
@@ -179,6 +150,103 @@ export default function PlanningPeriodDetailPage() {
       }
     } finally {
       setCreatingService(false);
+    }
+  }
+
+  // --- Edit / delete service ---
+  const [serviceActionError, setServiceActionError] = useState<string | null>(null);
+  const [editServiceTarget, setEditServiceTarget] = useState<Service | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editServiceDate, setEditServiceDate] = useState("");
+  const [editServiceTime, setEditServiceTime] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editRequirementRows, setEditRequirementRows] = useState<RequirementRow[]>([emptyRequirementRow()]);
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [savingServiceEdit, setSavingServiceEdit] = useState(false);
+
+  const [deleteServiceTarget, setDeleteServiceTarget] = useState<Service | null>(null);
+  const [deletingService, setDeletingService] = useState(false);
+
+  function openEditServiceDialog(service: Service) {
+    setServiceActionError(null);
+    setEditServiceTarget(service);
+    setEditTitle(service.title);
+    const { date, time } = splitSingaporeIsoString(service.startsAt);
+    setEditServiceDate(date);
+    setEditServiceTime(time);
+    setEditNotes(service.notes ?? "");
+    setEditRequirementRows(
+      service.requirements.length > 0
+        ? service.requirements.map((requirement) => ({
+            key: nextRequirementRowKey(),
+            roleId: requirement.roleId,
+            requiredCount: String(requirement.requiredCount),
+          }))
+        : [emptyRequirementRow()],
+    );
+    setEditFieldErrors({});
+    setEditFormError(null);
+  }
+
+  function closeEditServiceDialog() {
+    setEditServiceTarget(null);
+  }
+
+  async function handleEditServiceSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!idToken || !editServiceTarget) return;
+    setEditFormError(null);
+
+    const errors: Record<string, string> = {};
+    const trimmedTitle = editTitle.trim();
+    if (!trimmedTitle || trimmedTitle.length > 160) errors.title = messages.titleRequired;
+    if (!editServiceDate || !editServiceTime) errors.startsAt = messages.serviceDateTimeRequired;
+    const requirementsError = requirementsFieldError(editRequirementRows, messages);
+    if (requirementsError) errors.requirements = requirementsError;
+    setEditFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    const startsAt = toSingaporeIsoString(editServiceDate, editServiceTime);
+    if (!startsAt) {
+      setEditFieldErrors({ startsAt: messages.serviceDateTimeRequired });
+      return;
+    }
+
+    setSavingServiceEdit(true);
+    try {
+      const { service } = await updateService(idToken, periodId, editServiceTarget.id, {
+        title: trimmedTitle,
+        startsAt,
+        notes: editNotes.trim() ? editNotes.trim() : null,
+        requirements: requirementsPayload(editRequirementRows),
+      });
+      setServices((previous) =>
+        previous
+          .map((existing) => (existing.id === service.id ? service : existing))
+          .sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+      );
+      setEditServiceTarget(null);
+    } catch (error) {
+      setEditFormError(resolveApiErrorMessage(error, messages));
+    } finally {
+      setSavingServiceEdit(false);
+    }
+  }
+
+  async function handleDeleteService() {
+    if (!idToken || !deleteServiceTarget) return;
+    setServiceActionError(null);
+    setDeletingService(true);
+    try {
+      await deleteService(idToken, periodId, deleteServiceTarget.id);
+      setServices((previous) => previous.filter((service) => service.id !== deleteServiceTarget.id));
+      setDeleteServiceTarget(null);
+    } catch (error) {
+      setServiceActionError(resolveApiErrorMessage(error, messages));
+      setDeleteServiceTarget(null);
+    } finally {
+      setDeletingService(false);
     }
   }
 
@@ -276,6 +344,11 @@ export default function PlanningPeriodDetailPage() {
 
       <section className={styles.panel}>
         <h2 className={styles.panelHeading}>{messages.servicesHeading}</h2>
+        {serviceActionError ? (
+          <div className={styles.errorBanner} role="alert">
+            <p>{serviceActionError}</p>
+          </div>
+        ) : null}
         {services.length === 0 ? (
           <p className={styles.emptyState}>{messages.servicesEmpty}</p>
         ) : (
@@ -285,6 +358,8 @@ export default function PlanningPeriodDetailPage() {
                 <th>{messages.serviceColumnTitle}</th>
                 <th>{messages.serviceColumnStart}</th>
                 <th>{messages.serviceColumnNotes}</th>
+                <th>{messages.serviceColumnRequirements}</th>
+                <th>{messages.serviceColumnActions}</th>
               </tr>
             </thead>
             <tbody>
@@ -293,6 +368,36 @@ export default function PlanningPeriodDetailPage() {
                   <td>{service.title}</td>
                   <td>{formatDateTime(service.startsAt, locale)}</td>
                   <td>{service.notes ?? ""}</td>
+                  <td>
+                    <div className={styles.roleBadgeList}>
+                      {service.requirements.map((requirement) => (
+                        <span
+                          key={requirement.roleId}
+                          className={`${styles.badge} ${styles.badgeDraft}`}
+                        >
+                          {requirement.roleName} × {requirement.requiredCount}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td>
+                    <div className={styles.actionsRow}>
+                      <button
+                        type="button"
+                        className={styles.smallButton}
+                        onClick={() => openEditServiceDialog(service)}
+                      >
+                        {messages.editServiceButton}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() => setDeleteServiceTarget(service)}
+                      >
+                        {messages.deleteServiceButton}
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -349,58 +454,20 @@ export default function PlanningPeriodDetailPage() {
             />
           </div>
 
-          <div>
-            <h4 className={styles.panelHeading}>{messages.requirementsHeading}</h4>
-            <p className={styles.hint}>{messages.requirementsHint}</p>
-            <div className={styles.requirementsList}>
-              {requirementRows.map((row) => (
-                <div className={styles.requirementRow} key={row.key}>
-                  <div className={styles.field}>
-                    <label htmlFor={`role-${row.key}`}>{messages.fieldRole}</label>
-                    <select
-                      id={`role-${row.key}`}
-                      value={row.roleId}
-                      onChange={(event) => updateRequirementRow(row.key, { roleId: event.target.value })}
-                    >
-                      <option value="">{messages.selectRole}</option>
-                      {roles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={styles.field}>
-                    <label htmlFor={`count-${row.key}`}>{messages.fieldRequiredCount}</label>
-                    <input
-                      id={`count-${row.key}`}
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={row.requiredCount}
-                      onChange={(event) =>
-                        updateRequirementRow(row.key, { requiredCount: event.target.value })
-                      }
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.smallButton}
-                    onClick={() => removeRequirementRow(row.key)}
-                    disabled={requirementRows.length === 1}
-                  >
-                    {messages.removeRequirement}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button type="button" className={styles.secondaryButton} onClick={addRequirementRow}>
-              {messages.addRequirement}
-            </button>
-            {serviceFieldErrors.requirements ? (
-              <p className={styles.fieldError}>{serviceFieldErrors.requirements}</p>
-            ) : null}
-          </div>
+          <RoleRequirementsEditor
+            idPrefix="service"
+            rows={requirementRows}
+            roles={roles}
+            onChange={setRequirementRows}
+            error={serviceFieldErrors.requirements}
+            heading={messages.requirementsHeading}
+            hint={messages.requirementsHint}
+            addLabel={messages.addRequirement}
+            removeLabel={messages.removeRequirement}
+            roleLabel={messages.fieldRole}
+            countLabel={messages.fieldRequiredCount}
+            selectPlaceholder={messages.selectRole}
+          />
 
           {serviceFormError ? (
             <div className={styles.errorBanner} role="alert">
@@ -529,6 +596,116 @@ export default function PlanningPeriodDetailPage() {
           </div>
         </form>
       </section>
+
+      {editServiceTarget ? (
+        <div className={styles.dialogOverlay} role="presentation" onClick={closeEditServiceDialog}>
+          <div
+            className={styles.dialogWide}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-service-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="edit-service-heading" className={styles.panelHeading}>
+              {messages.editServiceHeading}
+            </h2>
+            <form className={styles.form} onSubmit={(event) => void handleEditServiceSubmit(event)}>
+              <div className={styles.fieldGrid}>
+                <div className={styles.field}>
+                  <label htmlFor="edit-service-title">{messages.fieldTitle}</label>
+                  <input
+                    id="edit-service-title"
+                    type="text"
+                    maxLength={160}
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                  />
+                  {editFieldErrors.title ? <p className={styles.fieldError}>{editFieldErrors.title}</p> : null}
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="edit-service-date">{messages.fieldServiceDate}</label>
+                  <input
+                    id="edit-service-date"
+                    type="date"
+                    value={editServiceDate}
+                    onChange={(event) => setEditServiceDate(event.target.value)}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label htmlFor="edit-service-time">{messages.fieldServiceTime}</label>
+                  <input
+                    id="edit-service-time"
+                    type="time"
+                    value={editServiceTime}
+                    onChange={(event) => setEditServiceTime(event.target.value)}
+                  />
+                  {editFieldErrors.startsAt ? (
+                    <p className={styles.fieldError}>{editFieldErrors.startsAt}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className={styles.field}>
+                <label htmlFor="edit-service-notes">{messages.fieldNotes}</label>
+                <textarea
+                  id="edit-service-notes"
+                  maxLength={2000}
+                  rows={2}
+                  value={editNotes}
+                  onChange={(event) => setEditNotes(event.target.value)}
+                />
+              </div>
+
+              <RoleRequirementsEditor
+                idPrefix="edit-service"
+                rows={editRequirementRows}
+                roles={roles}
+                onChange={setEditRequirementRows}
+                error={editFieldErrors.requirements}
+                heading={messages.requirementsHeading}
+                hint={messages.requirementsHint}
+                addLabel={messages.addRequirement}
+                removeLabel={messages.removeRequirement}
+                roleLabel={messages.fieldRole}
+                countLabel={messages.fieldRequiredCount}
+                selectPlaceholder={messages.selectRole}
+              />
+
+              {editFormError ? (
+                <div className={styles.errorBanner} role="alert">
+                  <p>{editFormError}</p>
+                </div>
+              ) : null}
+
+              <div className={styles.actionsRow}>
+                <button type="submit" className={styles.primaryButton} disabled={savingServiceEdit}>
+                  {savingServiceEdit ? messages.savingServiceEdit : messages.editServiceSubmit}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={closeEditServiceDialog}
+                  disabled={savingServiceEdit}
+                >
+                  {messages.closeEditServiceDialog}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteServiceTarget ? (
+        <ConfirmDialog
+          title={messages.deleteServiceConfirmTitle}
+          body={messages.deleteServiceConfirmBody}
+          confirmLabel={messages.deleteServiceConfirmConfirm}
+          cancelLabel={messages.deleteServiceConfirmCancel}
+          busy={deletingService}
+          onConfirm={() => void handleDeleteService()}
+          onCancel={() => setDeleteServiceTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,30 @@ export type ServiceInput = Readonly<{
   requirements: ReadonlyArray<Readonly<{ roleId: string; requiredCount: number }>>;
 }>;
 
+export type ServiceUpdateInput = Readonly<{
+  title: string;
+  startsAt: Date;
+  notes?: string | null;
+  requirements: ReadonlyArray<Readonly<{ roleId: string; requiredCount: number }>>;
+}>;
+
+export type ServiceRoleRequirement = Readonly<{
+  roleId: string;
+  roleName: string;
+  requiredCount: number;
+}>;
+
+export type ServiceWithRequirements = Readonly<{
+  id: string;
+  planningPeriodId: string;
+  title: string;
+  startsAt: Date;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  requirements: ReadonlyArray<ServiceRoleRequirement>;
+}>;
+
 export type MemberRoleInput = ReadonlyArray<
   Readonly<{ roleId: string; proficiency: "primary" | "secondary" }>
 >;
@@ -179,13 +203,20 @@ export type NotificationDelivery = Readonly<{
 export interface DomainRepository {
   listPlanningPeriods(): Promise<unknown[]>;
   createPlanningPeriod(input: PlanningPeriodInput, actorUserId: string): Promise<unknown>;
-  listServices(planningPeriodId: string): Promise<unknown[]>;
+  listServices(planningPeriodId: string): Promise<ServiceWithRequirements[]>;
   getPlanningPeriod(planningPeriodId: string): Promise<{
     id: string;
     startsOn: string;
     endsOn: string;
   } | null>;
-  createService(input: ServiceInput, actorUserId: string): Promise<unknown>;
+  createService(input: ServiceInput, actorUserId: string): Promise<ServiceWithRequirements>;
+  updateService(
+    planningPeriodId: string,
+    serviceId: string,
+    input: ServiceUpdateInput,
+    actorUserId: string,
+  ): Promise<ServiceWithRequirements>;
+  deleteService(planningPeriodId: string, serviceId: string, actorUserId: string): Promise<{ id: string }>;
   listRoles(): Promise<unknown[]>;
   createRole(input: CreateRoleInput, actorUserId: string): Promise<RoleRecord>;
   createPendingUser(

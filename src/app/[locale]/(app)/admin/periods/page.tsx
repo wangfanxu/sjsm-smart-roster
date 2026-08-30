@@ -2,17 +2,35 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { isLocale, type Locale } from "@/i18n/config";
 import { useAuth } from "@/lib/auth-client";
-import { createPlanningPeriod, listPlanningPeriods } from "../api";
+import { createPlanningPeriod, createService, listPlanningPeriods, listRoles } from "../api";
 import { extractValidationFieldPaths, resolveApiErrorMessage } from "../errors";
-import { formatDate } from "../format";
-import { getAdminMessages } from "../messages";
+import { formatDate, saturdaysBetween, toSingaporeIsoString } from "../format";
+import { getAdminMessages, type AdminMessages } from "../messages";
+import {
+  emptyRequirementRow,
+  requirementsFieldError,
+  requirementsPayload,
+  RoleRequirementsEditor,
+  type RequirementRow,
+} from "../role-requirements-editor";
 import styles from "../admin.module.css";
-import type { PlanningPeriod } from "../types";
+import type { PlanningPeriod, Role } from "../types";
 
 type LoadState = "loading" | "ready" | "error";
+
+type ServiceType = "eveningPrayer" | "communion";
+
+const serviceTypeDefaultTime: Record<ServiceType, string> = {
+  eveningPrayer: "15:00",
+  communion: "15:30",
+};
+
+function serviceTypeTitle(type: ServiceType, messages: AdminMessages): string {
+  return type === "communion" ? messages.serviceTypeCommunion : messages.serviceTypeEveningPrayer;
+}
 
 export default function PlanningPeriodsPage() {
   const params = useParams<{ locale: string }>();
@@ -23,6 +41,7 @@ export default function PlanningPeriodsPage() {
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [periods, setPeriods] = useState<PlanningPeriod[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
 
   const [name, setName] = useState("");
   const [startsOn, setStartsOn] = useState("");
@@ -31,11 +50,23 @@ export default function PlanningPeriodsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [templateRows, setTemplateRows] = useState<RequirementRow[]>([emptyRequirementRow()]);
+  const [saturdayTypes, setSaturdayTypes] = useState<Record<string, ServiceType>>({});
+  const saturdays = useMemo(() => saturdaysBetween(startsOn, endsOn), [startsOn, endsOn]);
+
+  function saturdayType(date: string): ServiceType {
+    return saturdayTypes[date] ?? "eveningPrayer";
+  }
+
   const loadPeriods = useCallback(async () => {
     if (!idToken) return;
     try {
-      const response = await listPlanningPeriods(idToken);
-      setPeriods([...response.planningPeriods]);
+      const [periodsResponse, rolesResponse] = await Promise.all([
+        listPlanningPeriods(idToken),
+        listRoles(idToken),
+      ]);
+      setPeriods([...periodsResponse.planningPeriods]);
+      setRoles([...rolesResponse.roles]);
       setLoadState("ready");
     } catch {
       setLoadState("error");
@@ -67,6 +98,10 @@ export default function PlanningPeriodsPage() {
     } else if (startsOn > endsOn) {
       errors.endsOn = messages.endsBeforeStarts;
     }
+    if (templateRows.some((row) => row.roleId)) {
+      const requirementsError = requirementsFieldError(templateRows, messages);
+      if (requirementsError) errors.requirements = requirementsError;
+    }
     return errors;
   }
 
@@ -85,10 +120,27 @@ export default function PlanningPeriodsPage() {
         startsOn,
         endsOn,
       });
+      setPeriods((previous) => [...previous, planningPeriod]);
+
+      const populatedTemplate = requirementsPayload(templateRows);
+      if (populatedTemplate.length > 0 && saturdays.length > 0) {
+        for (const date of saturdays) {
+          const type = saturdayType(date);
+          const startsAt = toSingaporeIsoString(date, serviceTypeDefaultTime[type]);
+          if (!startsAt) continue;
+          await createService(idToken, planningPeriod.id, {
+            title: serviceTypeTitle(type, messages),
+            startsAt,
+            requirements: populatedTemplate,
+          });
+        }
+      }
+
       setName("");
       setStartsOn("");
       setEndsOn("");
-      setPeriods((previous) => [...previous, planningPeriod]);
+      setTemplateRows([emptyRequirementRow()]);
+      setSaturdayTypes({});
       router.push(`/${locale}/admin/periods/${planningPeriod.id}`);
     } catch (error) {
       const paths = extractValidationFieldPaths(error);
@@ -189,6 +241,58 @@ export default function PlanningPeriodsPage() {
               {fieldErrors.dates ? <p className={styles.fieldError}>{fieldErrors.dates}</p> : null}
             </div>
           </div>
+
+          {saturdays.length > 0 ? (
+            <div>
+              <h3 className={styles.panelHeading}>{messages.weeklyGenerationHeading}</h3>
+              <p className={styles.panelIntro}>{messages.weeklyGenerationIntro}</p>
+
+              <RoleRequirementsEditor
+                idPrefix="weekly-template"
+                rows={templateRows}
+                roles={roles}
+                onChange={setTemplateRows}
+                error={fieldErrors.requirements}
+                heading={messages.requirementsHeading}
+                hint={messages.weeklyTemplateHint}
+                addLabel={messages.addRequirement}
+                removeLabel={messages.removeRequirement}
+                roleLabel={messages.fieldRole}
+                countLabel={messages.fieldRequiredCount}
+                selectPlaceholder={messages.selectRole}
+              />
+
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>{messages.weeklyDateColumn}</th>
+                    <th>{messages.serviceTypeLabel}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {saturdays.map((date) => (
+                    <tr key={date}>
+                      <td>{formatDate(date, locale)}</td>
+                      <td>
+                        <select
+                          value={saturdayType(date)}
+                          onChange={(event) =>
+                            setSaturdayTypes((previous) => ({
+                              ...previous,
+                              [date]: event.target.value as ServiceType,
+                            }))
+                          }
+                        >
+                          <option value="eveningPrayer">{messages.serviceTypeEveningPrayer}</option>
+                          <option value="communion">{messages.serviceTypeCommunion}</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
 
           {formError ? (
             <div className={styles.errorBanner} role="alert">

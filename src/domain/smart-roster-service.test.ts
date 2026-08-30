@@ -9,6 +9,8 @@ function repositoryStub(): DomainRepository {
     listServices: vi.fn(),
     getPlanningPeriod: vi.fn(),
     createService: vi.fn(),
+    updateService: vi.fn(),
+    deleteService: vi.fn(),
     listRoles: vi.fn(),
     createRole: vi.fn(),
     createPendingUser: vi.fn(),
@@ -83,6 +85,30 @@ describe("SmartRosterService", () => {
       ),
     ).rejects.toMatchObject({ code: "service_outside_planning_period", status: 400 });
     expect(repository.createService).not.toHaveBeenCalled();
+  });
+
+  it("rejects updating a service to a date outside its planning period", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getPlanningPeriod).mockResolvedValue({
+      id: "period",
+      startsOn: "2026-09-01",
+      endsOn: "2026-10-31",
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.updateService(
+        "period",
+        "service",
+        {
+          title: "Out of range",
+          startsAt: new Date("2026-11-01T01:00:00Z"),
+          requirements: [{ roleId: "role", requiredCount: 1 }],
+        },
+        { userId: "administrator" },
+      ),
+    ).rejects.toMatchObject({ code: "service_outside_planning_period", status: 400 });
+    expect(repository.updateService).not.toHaveBeenCalled();
   });
 
   it("formats upcoming assignment dates and times for Singapore", async () => {

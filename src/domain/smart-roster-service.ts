@@ -10,6 +10,7 @@ import type {
   PlanningPeriodInput,
   RosterGenerationRequest,
   ServiceInput,
+  ServiceUpdateInput,
 } from "./types";
 import {
   defaultRosterGenerationWeights,
@@ -75,6 +76,29 @@ export class SmartRosterService {
       );
     }
     return this.repository.createService(input, actor.userId);
+  }
+
+  async updateService(
+    planningPeriodId: string,
+    serviceId: string,
+    input: ServiceUpdateInput,
+    actor: Actor,
+  ) {
+    const period = await this.repository.getPlanningPeriod(planningPeriodId);
+    if (!period) throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+    const serviceDate = calendarDateInTimeZone(input.startsAt);
+    if (serviceDate < period.startsOn || serviceDate > period.endsOn) {
+      throw new ApiError(
+        "service_outside_planning_period",
+        400,
+        "Service date must fall inside the planning period",
+      );
+    }
+    return this.repository.updateService(planningPeriodId, serviceId, input, actor.userId);
+  }
+
+  deleteService(planningPeriodId: string, serviceId: string, actor: Actor) {
+    return this.repository.deleteService(planningPeriodId, serviceId, actor.userId);
   }
 
   listRoles() {

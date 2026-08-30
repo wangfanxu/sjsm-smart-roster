@@ -16,6 +16,12 @@ export type Role = Readonly<{
   description: string | null;
 }>;
 
+export type ServiceRequirement = Readonly<{
+  roleId: string;
+  roleName: string;
+  requiredCount: number;
+}>;
+
 export type Service = Readonly<{
   id: string;
   planningPeriodId: string;
@@ -24,6 +30,7 @@ export type Service = Readonly<{
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  requirements: ReadonlyArray<ServiceRequirement>;
 }>;
 
 export type CandidateStatus = "draft" | "published" | "superseded";

@@ -12,6 +12,8 @@ import type {
   PlanningPeriodInput,
   RosterGenerationSource,
   ServiceInput,
+  ServiceRoleRequirement,
+  ServiceUpdateInput,
   UserWithRoles,
 } from "@/domain/types";
 import * as schema from "./schema";
@@ -56,11 +58,35 @@ export function createDomainRepository(
     },
 
     async listServices(planningPeriodId: string) {
-      return database
+      const serviceRows = await database
         .select()
         .from(services)
         .where(eq(services.planningPeriodId, planningPeriodId))
         .orderBy(asc(services.startsAt));
+
+      const requirementRows = await database
+        .select({
+          serviceId: serviceRoleRequirements.serviceId,
+          roleId: serviceRoleRequirements.roleId,
+          roleName: roles.name,
+          requiredCount: serviceRoleRequirements.requiredCount,
+        })
+        .from(serviceRoleRequirements)
+        .innerJoin(roles, eq(serviceRoleRequirements.roleId, roles.id))
+        .innerJoin(services, eq(serviceRoleRequirements.serviceId, services.id))
+        .where(eq(services.planningPeriodId, planningPeriodId));
+
+      const requirementsByService = new Map<string, ServiceRoleRequirement[]>();
+      for (const row of requirementRows) {
+        const list = requirementsByService.get(row.serviceId) ?? [];
+        list.push({ roleId: row.roleId, roleName: row.roleName, requiredCount: row.requiredCount });
+        requirementsByService.set(row.serviceId, list);
+      }
+
+      return serviceRows.map((service) => ({
+        ...service,
+        requirements: requirementsByService.get(service.id) ?? [],
+      }));
     },
 
     async getPlanningPeriod(planningPeriodId: string) {
@@ -75,12 +101,13 @@ export function createDomainRepository(
     async createService(input: ServiceInput, actorUserId: string) {
       return database.transaction(async (transaction) => {
         const roleRecords = await transaction
-          .select({ id: roles.id })
+          .select({ id: roles.id, name: roles.name })
           .from(roles)
           .where(inArray(roles.id, input.requirements.map((requirement) => requirement.roleId)));
         if (roleRecords.length !== input.requirements.length) {
           throw new ApiError("role_not_found", 404, "One or more roles do not exist");
         }
+        const roleNameById = new Map(roleRecords.map((role) => [role.id, role.name]));
         const [service] = await transaction
           .insert(services)
           .values({
@@ -100,7 +127,123 @@ export function createDomainRepository(
           entityId: service.id,
           metadata: { planningPeriodId: input.planningPeriodId },
         });
-        return service;
+        return {
+          ...service,
+          requirements: input.requirements.map((requirement) => ({
+            roleId: requirement.roleId,
+            roleName: roleNameById.get(requirement.roleId)!,
+            requiredCount: requirement.requiredCount,
+          })),
+        };
+      });
+    },
+
+    async updateService(
+      planningPeriodId: string,
+      serviceId: string,
+      input: ServiceUpdateInput,
+      actorUserId: string,
+    ) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: services.id })
+          .from(services)
+          .where(and(eq(services.id, serviceId), eq(services.planningPeriodId, planningPeriodId)))
+          .limit(1);
+        if (!existing) throw new ApiError("service_not_found", 404, "Service not found");
+
+        const [published] = await transaction
+          .select({ id: assignments.id })
+          .from(assignments)
+          .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+          .where(and(eq(assignments.serviceId, serviceId), eq(rosterCandidates.status, "published")))
+          .limit(1);
+        if (published) {
+          throw new ApiError(
+            "service_has_published_assignments",
+            409,
+            "This service has assignments on a published roster and cannot be changed",
+          );
+        }
+
+        const roleRecords = await transaction
+          .select({ id: roles.id, name: roles.name })
+          .from(roles)
+          .where(inArray(roles.id, input.requirements.map((requirement) => requirement.roleId)));
+        if (roleRecords.length !== input.requirements.length) {
+          throw new ApiError("role_not_found", 404, "One or more roles do not exist");
+        }
+        const roleNameById = new Map(roleRecords.map((role) => [role.id, role.name]));
+
+        const [service] = await transaction
+          .update(services)
+          .set({
+            title: input.title,
+            startsAt: input.startsAt,
+            notes: input.notes ?? null,
+            updatedAt: new Date(),
+          })
+          .where(eq(services.id, serviceId))
+          .returning();
+
+        await transaction
+          .delete(serviceRoleRequirements)
+          .where(eq(serviceRoleRequirements.serviceId, serviceId));
+        await transaction.insert(serviceRoleRequirements).values(
+          input.requirements.map((requirement) => ({ serviceId, ...requirement })),
+        );
+
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "service.updated",
+          entityType: "service",
+          entityId: serviceId,
+          metadata: { planningPeriodId },
+        });
+
+        return {
+          ...service,
+          requirements: input.requirements.map((requirement) => ({
+            roleId: requirement.roleId,
+            roleName: roleNameById.get(requirement.roleId)!,
+            requiredCount: requirement.requiredCount,
+          })),
+        };
+      });
+    },
+
+    async deleteService(planningPeriodId: string, serviceId: string, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: services.id })
+          .from(services)
+          .where(and(eq(services.id, serviceId), eq(services.planningPeriodId, planningPeriodId)))
+          .limit(1);
+        if (!existing) throw new ApiError("service_not_found", 404, "Service not found");
+
+        const [published] = await transaction
+          .select({ id: assignments.id })
+          .from(assignments)
+          .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+          .where(and(eq(assignments.serviceId, serviceId), eq(rosterCandidates.status, "published")))
+          .limit(1);
+        if (published) {
+          throw new ApiError(
+            "service_has_published_assignments",
+            409,
+            "This service has assignments on a published roster and cannot be deleted",
+          );
+        }
+
+        await transaction.delete(services).where(eq(services.id, serviceId));
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "service.deleted",
+          entityType: "service",
+          entityId: serviceId,
+          metadata: { planningPeriodId },
+        });
+        return { id: serviceId };
       });
     },
 

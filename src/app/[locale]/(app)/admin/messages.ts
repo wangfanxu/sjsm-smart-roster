@@ -61,6 +61,32 @@ export type AdminMessages = {
   requiredCountRange: string;
   rolesLoadError: string;
   serviceOutOfRange: string;
+  serviceColumnRequirements: string;
+  serviceColumnActions: string;
+  editServiceButton: string;
+  deleteServiceButton: string;
+  editServiceHeading: string;
+  editServiceSubmit: string;
+  savingServiceEdit: string;
+  serviceUpdated: string;
+  closeEditServiceDialog: string;
+  deleteServiceConfirmTitle: string;
+  deleteServiceConfirmBody: string;
+  deleteServiceConfirmConfirm: string;
+  deleteServiceConfirmCancel: string;
+  deletingService: string;
+  serviceDeleted: string;
+  serviceDeleteError: string;
+  apiErrorServiceNotFound: string;
+  apiErrorServiceHasPublishedAssignments: string;
+
+  weeklyGenerationHeading: string;
+  weeklyGenerationIntro: string;
+  weeklyTemplateHint: string;
+  weeklyDateColumn: string;
+  serviceTypeLabel: string;
+  serviceTypeEveningPrayer: string;
+  serviceTypeCommunion: string;
 
   candidatesHeading: string;
   candidatesEmpty: string;
@@ -294,6 +320,35 @@ const messages: Record<Locale, AdminMessages> = {
     requiredCountRange: "Required count must be a whole number from 1 to 20.",
     rolesLoadError: "Could not load roles.",
     serviceOutOfRange: "The service time must fall within the planning period's dates.",
+    serviceColumnRequirements: "Role requirements",
+    serviceColumnActions: "Actions",
+    editServiceButton: "Edit",
+    deleteServiceButton: "Delete",
+    editServiceHeading: "Edit service",
+    editServiceSubmit: "Save changes",
+    savingServiceEdit: "Saving…",
+    serviceUpdated: "Service updated.",
+    closeEditServiceDialog: "Cancel",
+    deleteServiceConfirmTitle: "Delete this service?",
+    deleteServiceConfirmBody:
+      "This removes the service and its role requirements. This cannot be undone from this screen.",
+    deleteServiceConfirmConfirm: "Yes, delete",
+    deleteServiceConfirmCancel: "Cancel",
+    deletingService: "Deleting…",
+    serviceDeleted: "Service deleted.",
+    serviceDeleteError: "Could not delete this service.",
+    apiErrorServiceNotFound: "This service could not be found.",
+    apiErrorServiceHasPublishedAssignments:
+      "This service has assignments on a published roster and cannot be changed here.",
+
+    weeklyGenerationHeading: "Generate weekly services (optional)",
+    weeklyGenerationIntro:
+      "Fill in role requirements below to auto-create one service for every Saturday in this period. Leave it empty to create the period with no services yet.",
+    weeklyTemplateHint: "Applied to every generated Saturday service below.",
+    weeklyDateColumn: "Date",
+    serviceTypeLabel: "Service type",
+    serviceTypeEveningPrayer: "Evening Prayer Service (15:00)",
+    serviceTypeCommunion: "Communion Service (15:30)",
 
     candidatesHeading: "Roster candidates",
     candidatesEmpty: "No candidates generated yet.",
@@ -526,6 +581,33 @@ const messages: Record<Locale, AdminMessages> = {
     requiredCountRange: "所需人数必须是1到20之间的整数。",
     rolesLoadError: "无法加载角色列表。",
     serviceOutOfRange: "服务时间必须在排班周期的日期范围内。",
+    serviceColumnRequirements: "角色需求",
+    serviceColumnActions: "操作",
+    editServiceButton: "编辑",
+    deleteServiceButton: "删除",
+    editServiceHeading: "编辑服务",
+    editServiceSubmit: "保存修改",
+    savingServiceEdit: "保存中……",
+    serviceUpdated: "服务已更新。",
+    closeEditServiceDialog: "取消",
+    deleteServiceConfirmTitle: "确认删除此服务？",
+    deleteServiceConfirmBody: "这将删除该服务及其角色需求，此操作在此页面上无法撤销。",
+    deleteServiceConfirmConfirm: "确认删除",
+    deleteServiceConfirmCancel: "取消",
+    deletingService: "删除中……",
+    serviceDeleted: "服务已删除。",
+    serviceDeleteError: "无法删除此服务。",
+    apiErrorServiceNotFound: "找不到此服务。",
+    apiErrorServiceHasPublishedAssignments: "该服务已有排班表发布的分配，无法在此修改。",
+
+    weeklyGenerationHeading: "自动生成每周服务（可选）",
+    weeklyGenerationIntro:
+      "在下方填写角色需求后，将自动为该周期内每个周六生成一场服务；留空则仅创建排班周期，不生成任何服务。",
+    weeklyTemplateHint: "此需求模板将套用到下方每一场自动生成的周六服务。",
+    weeklyDateColumn: "日期",
+    serviceTypeLabel: "崇拜类型",
+    serviceTypeEveningPrayer: "晚祷崇拜（15:00）",
+    serviceTypeCommunion: "圣餐崇拜（15:30）",
 
     candidatesHeading: "候选排班表",
     candidatesEmpty: "还没有生成候选排班表。",
@@ -718,6 +800,8 @@ const apiErrorKeyMap: Record<string, keyof AdminMessages> = {
   ineligible_assignee: "apiErrorIneligibleAssignee",
   assignment_conflict: "apiErrorAssignmentConflict",
   assignment_not_found: "apiErrorAssignmentNotFound",
+  service_not_found: "apiErrorServiceNotFound",
+  service_has_published_assignments: "apiErrorServiceHasPublishedAssignments",
 };
 
 export function describeApiErrorCode(code: string, messagesForLocale: AdminMessages): string {

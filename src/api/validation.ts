@@ -127,11 +127,15 @@ export const candidateGenerationInput = z
   })
   .strict();
 
-export const assignmentLockInput = z
+export const assignmentUpdateInput = z
   .object({
-    isLocked: z.boolean(),
+    isLocked: z.boolean().optional(),
+    userId: z.uuid().optional(),
   })
-  .strict();
+  .strict()
+  .refine((value) => value.isLocked !== undefined || value.userId !== undefined, {
+    message: "Provide isLocked or userId",
+  });
 
 export const assistantAskInput = z
   .object({

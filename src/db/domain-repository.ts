@@ -304,7 +304,12 @@ export function createDomainRepository(
 
     async listEligibleUsersForServiceRole(serviceId: string, roleId: string) {
       return database
-        .select({ userId: users.id, proficiency: userRoles.proficiency })
+        .select({
+          userId: users.id,
+          displayName: users.displayName,
+          email: users.email,
+          proficiency: userRoles.proficiency,
+        })
         .from(userRoles)
         .innerJoin(users, eq(userRoles.userId, users.id))
         .innerJoin(services, eq(services.id, serviceId))
@@ -592,6 +597,68 @@ export function createDomainRepository(
           entityType: "assignment",
           entityId: assignmentId,
           metadata: { candidateId, isLocked },
+        });
+        return updated;
+      });
+    },
+
+    async reassignAssignment(
+      candidateId: string,
+      assignmentId: string,
+      userId: string,
+      isLocked: boolean,
+      actorUserId: string,
+    ) {
+      return database.transaction(async (transaction) => {
+        const [record] = await transaction
+          .select({ id: assignments.id, status: rosterCandidates.status, serviceId: assignments.serviceId })
+          .from(assignments)
+          .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+          .where(and(eq(assignments.id, assignmentId), eq(assignments.candidateId, candidateId)))
+          .limit(1);
+        if (!record) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+        if (record.status !== "draft") {
+          throw new ApiError(
+            "candidate_not_editable",
+            409,
+            "Only a draft candidate's assignments can be reassigned",
+          );
+        }
+        const [conflict] = await transaction
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(
+            and(
+              eq(assignments.candidateId, candidateId),
+              eq(assignments.serviceId, record.serviceId),
+              eq(assignments.userId, userId),
+              ne(assignments.id, assignmentId),
+            ),
+          )
+          .limit(1);
+        if (conflict) {
+          throw new ApiError(
+            "assignment_conflict",
+            409,
+            "This volunteer is already assigned to another role for this service",
+          );
+        }
+        const [updated] = await transaction
+          .update(assignments)
+          .set({ userId, source: "manual", isLocked, updatedAt: new Date() })
+          .where(eq(assignments.id, assignmentId))
+          .returning({
+            id: assignments.id,
+            userId: assignments.userId,
+            isLocked: assignments.isLocked,
+            source: assignments.source,
+          });
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "assignment.reassigned",
+          entityType: "assignment",
+          entityId: assignmentId,
+          metadata: { candidateId, userId, isLocked },
         });
         return updated;
       });

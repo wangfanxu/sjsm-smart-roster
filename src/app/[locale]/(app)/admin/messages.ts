@@ -128,6 +128,20 @@ export type AdminMessages = {
   unlockButton: string;
   updatingLock: string;
   lockUpdateError: string;
+  reassignButton: string;
+  reassignHeading: string;
+  reassignIntro: string;
+  reassignSelectLabel: string;
+  reassignSelectPlaceholder: string;
+  reassignSubmit: string;
+  reassigning: string;
+  reassignSuccess: string;
+  reassignNoEligible: string;
+  reassignLoadError: string;
+  closeReassignDialog: string;
+  apiErrorIneligibleAssignee: string;
+  apiErrorAssignmentConflict: string;
+  apiErrorAssignmentNotFound: string;
 
   regenerateHeading: string;
   regenerateIntro: string;
@@ -347,6 +361,20 @@ const messages: Record<Locale, AdminMessages> = {
     unlockButton: "Unlock",
     updatingLock: "Updating…",
     lockUpdateError: "Could not update the lock for this assignment.",
+    reassignButton: "Reassign",
+    reassignHeading: "Reassign this assignment",
+    reassignIntro: "Choose an eligible, active volunteer to serve this role instead.",
+    reassignSelectLabel: "Volunteer",
+    reassignSelectPlaceholder: "Select a volunteer",
+    reassignSubmit: "Save reassignment",
+    reassigning: "Saving…",
+    reassignSuccess: "Assignment reassigned.",
+    reassignNoEligible: "No eligible volunteer is available for this role on this date.",
+    reassignLoadError: "Could not load eligible volunteers.",
+    closeReassignDialog: "Cancel",
+    apiErrorIneligibleAssignee: "That volunteer is not eligible for this role.",
+    apiErrorAssignmentConflict: "That volunteer is already assigned to another role for this service.",
+    apiErrorAssignmentNotFound: "This assignment could not be found.",
 
     regenerateHeading: "Regenerate",
     regenerateIntro:
@@ -564,6 +592,20 @@ const messages: Record<Locale, AdminMessages> = {
     unlockButton: "解锁",
     updatingLock: "更新中……",
     lockUpdateError: "无法更新此分配的锁定状态。",
+    reassignButton: "重新分配",
+    reassignHeading: "重新分配此任务",
+    reassignIntro: "选择一位符合条件且活跃的志愿者来担任这个角色。",
+    reassignSelectLabel: "志愿者",
+    reassignSelectPlaceholder: "请选择志愿者",
+    reassignSubmit: "保存",
+    reassigning: "保存中……",
+    reassignSuccess: "已重新分配。",
+    reassignNoEligible: "该日期该角色暂无符合条件的志愿者。",
+    reassignLoadError: "无法加载符合条件的志愿者。",
+    closeReassignDialog: "取消",
+    apiErrorIneligibleAssignee: "该志愿者不符合此角色的条件。",
+    apiErrorAssignmentConflict: "该志愿者在此服务中已担任另一角色。",
+    apiErrorAssignmentNotFound: "找不到此分配。",
 
     regenerateHeading: "重新生成",
     regenerateIntro: "将创建新的候选排班表版本。已锁定的分配保持不变，其余部分将重新计算。",
@@ -673,6 +715,9 @@ const apiErrorKeyMap: Record<string, keyof AdminMessages> = {
   service_outside_planning_period: "serviceOutOfRange",
   email_already_registered: "apiErrorEmailAlreadyRegistered",
   user_not_found: "apiErrorUserNotFound",
+  ineligible_assignee: "apiErrorIneligibleAssignee",
+  assignment_conflict: "apiErrorAssignmentConflict",
+  assignment_not_found: "apiErrorAssignmentNotFound",
 };
 
 export function describeApiErrorCode(code: string, messagesForLocale: AdminMessages): string {

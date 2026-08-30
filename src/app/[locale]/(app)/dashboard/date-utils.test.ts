@@ -61,6 +61,7 @@ describe("sortAssignmentsChronologically", () => {
         serviceTime: "09:00",
         title: "Second",
         role: "Usher",
+        teammates: [],
       },
       {
         assignmentId: "a",
@@ -70,6 +71,7 @@ describe("sortAssignmentsChronologically", () => {
         serviceTime: "09:00",
         title: "First",
         role: "Drummer",
+        teammates: [],
       },
     ];
 

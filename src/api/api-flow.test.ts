@@ -1411,6 +1411,61 @@ describe("Sprint 2 lock and regenerate flow", () => {
     );
   });
 
+  it("includes other published assignees for the same service as teammates", async () => {
+    const draft = await generateDraft();
+    const drummerAssignment = draft.assignments.find((item) => item.serviceId === lockFirstServiceId)!;
+    const vocalistUserId =
+      drummerAssignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+
+    await pglite.exec(`
+      INSERT INTO assignments (candidate_id, service_id, role_id, user_id, is_locked, source)
+      VALUES (
+        '${draft.candidate.id}', '${lockFirstServiceId}', '${lockVocalistRoleId}',
+        '${vocalistUserId}', false, 'solver'
+      )
+    `);
+
+    const publishResponse = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    expect(publishResponse.status).toBe(200);
+
+    type AssignmentsResponse = {
+      assignments: Array<{
+        serviceId: string;
+        teammates: Array<{ userId: string; displayName: string; role: string }>;
+      }>;
+    };
+
+    const drummerView = await handleAssignmentsGet(
+      request("/api/v1/me/assignments"),
+      dependencies(firebaseUidByUserId[drummerAssignment.userId]),
+    );
+    const drummerBody = (await drummerView.json()) as AssignmentsResponse;
+    const drummerOwnAssignment = drummerBody.assignments.find(
+      (assignment) => assignment.serviceId === lockFirstServiceId,
+    )!;
+    expect(drummerOwnAssignment.teammates).toEqual([
+      expect.objectContaining({ userId: vocalistUserId, role: "Vocalist" }),
+    ]);
+
+    const vocalistView = await handleAssignmentsGet(
+      request("/api/v1/me/assignments"),
+      dependencies(firebaseUidByUserId[vocalistUserId]),
+    );
+    const vocalistBody = (await vocalistView.json()) as AssignmentsResponse;
+    const vocalistOwnAssignment = vocalistBody.assignments.find(
+      (assignment) => assignment.serviceId === lockFirstServiceId,
+    )!;
+    expect(vocalistOwnAssignment.teammates).toEqual([
+      expect.objectContaining({ userId: drummerAssignment.userId, role: "Drummer" }),
+    ]);
+  });
+
   it("denies publishing to volunteers", async () => {
     const draft = await generateDraft();
     const response = await handleCandidatePublishPost(

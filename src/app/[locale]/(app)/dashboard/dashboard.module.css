@@ -129,6 +129,12 @@
   white-space: nowrap;
 }
 
+.assignmentTeammates {
+  grid-column: 1 / 2;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .availabilityList {
   display: grid;
   gap: 10px;

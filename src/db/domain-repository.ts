@@ -542,6 +542,23 @@ export function createDomainRepository(
         .orderBy(asc(services.startsAt));
     },
 
+    async listServiceTeammates(serviceIds: ReadonlyArray<string>) {
+      if (serviceIds.length === 0) return [];
+      return database
+        .select({
+          serviceId: assignments.serviceId,
+          userId: users.id,
+          displayName: users.displayName,
+          roleName: roles.name,
+        })
+        .from(assignments)
+        .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+        .innerJoin(users, eq(assignments.userId, users.id))
+        .innerJoin(roles, eq(assignments.roleId, roles.id))
+        .where(and(inArray(assignments.serviceId, serviceIds), eq(rosterCandidates.status, "published")))
+        .orderBy(asc(roles.name), asc(users.displayName));
+    },
+
     async listEligibleUsersForServiceRole(serviceId: string, roleId: string) {
       return database
         .select({

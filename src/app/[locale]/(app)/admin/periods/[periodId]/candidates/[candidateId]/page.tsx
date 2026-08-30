@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { isLocale, type Locale } from "@/i18n/config";
 import { ApiRequestError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-client";
@@ -286,6 +286,26 @@ export default function CandidateDetailPage() {
   const explanation = candidate.explanation;
   const assignmentCountEntries = Object.entries(explanation.fairness.assignmentCountsByUser);
 
+  const assignmentGroups: Array<{
+    serviceId: string;
+    serviceTitle: string;
+    serviceStartsAt: string;
+    assignments: AssignmentDetail[];
+  }> = [];
+  for (const assignment of assignments) {
+    const group = assignmentGroups.find((entry) => entry.serviceId === assignment.serviceId);
+    if (group) {
+      group.assignments.push(assignment);
+    } else {
+      assignmentGroups.push({
+        serviceId: assignment.serviceId,
+        serviceTitle: assignment.serviceTitle,
+        serviceStartsAt: assignment.serviceStartsAt,
+        assignments: [assignment],
+      });
+    }
+  }
+
   return (
     <div className={styles.page}>
       <Link className={styles.breadcrumb} href={`/${locale}/admin/periods/${periodId}`}>
@@ -405,7 +425,6 @@ export default function CandidateDetailPage() {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>{messages.assignmentColumnService}</th>
                 <th>{messages.assignmentColumnRole}</th>
                 <th>{messages.assignmentColumnVolunteer}</th>
                 <th>{messages.assignmentColumnStatus}</th>
@@ -413,46 +432,52 @@ export default function CandidateDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {assignments.map((assignment) => (
-                <tr key={assignment.id} className={assignment.isLocked ? styles.rowCarriedOver : undefined}>
-                  <td>
-                    {assignment.serviceTitle} · {formatDateTime(assignment.serviceStartsAt, locale)}
-                  </td>
-                  <td>{assignment.roleName}</td>
-                  <td>{assignment.userDisplayName}</td>
-                  <td>
-                    {assignment.isLocked ? (
-                      <span className={styles.lockBadge}>{messages.carriedOverLabel}</span>
-                    ) : (
-                      <span className={styles.newBadge}>{messages.newlySolvedLabel}</span>
-                    )}
-                  </td>
-                  {isDraft ? (
-                    <td>
-                      <div className={styles.actionsRow}>
-                        <button
-                          type="button"
-                          className={styles.smallButton}
-                          disabled={lockUpdatingId === assignment.id}
-                          onClick={() => void handleToggleLock(assignment.id, !assignment.isLocked)}
-                        >
-                          {lockUpdatingId === assignment.id
-                            ? messages.updatingLock
-                            : assignment.isLocked
-                              ? messages.unlockButton
-                              : messages.lockButton}
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.smallButton}
-                          onClick={() => void openReassignDialog(assignment)}
-                        >
-                          {messages.reassignButton}
-                        </button>
-                      </div>
+              {assignmentGroups.map((group) => (
+                <Fragment key={group.serviceId}>
+                  <tr>
+                    <td colSpan={isDraft ? 4 : 3} className={styles.serviceGroupHeader}>
+                      {group.serviceTitle} · {formatDateTime(group.serviceStartsAt, locale)}
                     </td>
-                  ) : null}
-                </tr>
+                  </tr>
+                  {group.assignments.map((assignment) => (
+                    <tr key={assignment.id} className={assignment.isLocked ? styles.rowCarriedOver : undefined}>
+                      <td>{assignment.roleName}</td>
+                      <td>{assignment.userDisplayName}</td>
+                      <td>
+                        {assignment.isLocked ? (
+                          <span className={styles.lockBadge}>{messages.carriedOverLabel}</span>
+                        ) : (
+                          <span className={styles.newBadge}>{messages.newlySolvedLabel}</span>
+                        )}
+                      </td>
+                      {isDraft ? (
+                        <td>
+                          <div className={styles.actionsRow}>
+                            <button
+                              type="button"
+                              className={styles.smallButton}
+                              disabled={lockUpdatingId === assignment.id}
+                              onClick={() => void handleToggleLock(assignment.id, !assignment.isLocked)}
+                            >
+                              {lockUpdatingId === assignment.id
+                                ? messages.updatingLock
+                                : assignment.isLocked
+                                  ? messages.unlockButton
+                                  : messages.lockButton}
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.smallButton}
+                              onClick={() => void openReassignDialog(assignment)}
+                            >
+                              {messages.reassignButton}
+                            </button>
+                          </div>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

@@ -42,6 +42,15 @@ env:
     availability:
       - RUNTIME
 
+  # Kill switch for roster-published emails - flip to "false" to test
+  # publishing against real member data without sending anything, then
+  # flip back to "true" (or remove this line) and redeploy. Any value
+  # other than the literal string "false" is treated as enabled.
+  - variable: ROSTER_NOTIFICATIONS_ENABLED
+    value: "true"
+    availability:
+      - RUNTIME
+
   # Firebase Web SDK config for the browser sign-in UI. Not secret - see
   # .env.example. Needs BUILD availability because Next.js inlines
   # NEXT_PUBLIC_* variables into the client bundle at build time, not just

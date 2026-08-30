@@ -1480,6 +1480,27 @@ describe("Sprint 2 lock and regenerate flow", () => {
     }
   });
 
+  it("skips sending roster-published notifications when ROSTER_NOTIFICATIONS_ENABLED is false", async () => {
+    vi.stubEnv("ROSTER_NOTIFICATIONS_ENABLED", "false");
+    try {
+      const emailSender = fakeEmailSender();
+      const draft = await generateDraft();
+
+      const response = await handleCandidatePublishPost(
+        request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+          method: "POST",
+        }),
+        { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+        dependencies("firebase-lock-admin", emailSender),
+      );
+
+      expect(response.status).toBe(200);
+      expect(emailSender.send).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("does not resend a notification already marked sent when notified again for the same candidate", async () => {
     const emailSender = fakeEmailSender();
     const draft = await generateDraft();

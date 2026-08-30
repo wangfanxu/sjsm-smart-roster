@@ -23,10 +23,12 @@ export async function handleCandidatePublishPost(
     const periodId = uuidParameter.parse(rawPeriodId);
     const candidateId = uuidParameter.parse(rawCandidateId);
     const candidate = await dependencies.service.publishCandidate(periodId, candidateId, actor);
-    try {
-      await dependencies.notifications.notifyRosterPublished(candidate.id);
-    } catch (notificationError) {
-      console.error("Failed to send roster-published notifications", notificationError);
+    if (process.env.ROSTER_NOTIFICATIONS_ENABLED !== "false") {
+      try {
+        await dependencies.notifications.notifyRosterPublished(candidate.id);
+      } catch (notificationError) {
+        console.error("Failed to send roster-published notifications", notificationError);
+      }
     }
     return Response.json({ candidate });
   } catch (error) {

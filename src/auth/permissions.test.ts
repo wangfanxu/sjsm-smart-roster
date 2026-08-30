@@ -5,6 +5,8 @@ describe("role permissions", () => {
   it("limits volunteers to their own profile, assignments, availability, and replacements", () => {
     expect(hasPermission("volunteer", "assignment:read:self")).toBe(true);
     expect(hasPermission("volunteer", "availability:write:self")).toBe(true);
+    expect(hasPermission("volunteer", "profile:write:self")).toBe(true);
+    expect(hasPermission("volunteer", "profile:write:roles:self")).toBe(true);
     expect(hasPermission("volunteer", "team:read")).toBe(false);
     expect(hasPermission("volunteer", "roster:publish")).toBe(false);
   });

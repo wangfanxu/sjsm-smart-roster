@@ -382,6 +382,25 @@ export function createDomainRepository(
       });
     },
 
+    async updateDisplayName(userId: string, displayName: string, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [user] = await transaction
+          .update(users)
+          .set({ displayName, updatedAt: new Date() })
+          .where(eq(users.id, userId))
+          .returning({ id: users.id, displayName: users.displayName });
+        if (!user) throw new ApiError("user_not_found", 404, "User not found");
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "user.display_name_updated",
+          entityType: "user",
+          entityId: userId,
+          metadata: {},
+        });
+        return user;
+      });
+    },
+
     async createPendingUser(input: PendingUserInput, actorUserId: string) {
       return database.transaction(async (transaction) => {
         const [existing] = await transaction
@@ -414,6 +433,19 @@ export function createDomainRepository(
         });
         return user;
       });
+    },
+
+    async getMemberRoles(userId: string) {
+      return database
+        .select({
+          roleId: userRoles.roleId,
+          roleName: roles.name,
+          proficiency: userRoles.proficiency,
+        })
+        .from(userRoles)
+        .innerJoin(roles, eq(userRoles.roleId, roles.id))
+        .where(eq(userRoles.userId, userId))
+        .orderBy(asc(roles.name));
     },
 
     async listUsersWithRoles() {

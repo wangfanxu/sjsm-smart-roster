@@ -2,6 +2,8 @@ import type { Permission, SystemRole } from "./types";
 
 const volunteerPermissions = [
   "profile:read:self",
+  "profile:write:self",
+  "profile:write:roles:self",
   "assignment:read:self",
   "availability:read:self",
   "availability:write:self",

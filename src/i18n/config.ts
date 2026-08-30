@@ -24,6 +24,7 @@ type Messages = {
   notRegisteredDescription: string;
   signOut: string;
   navDashboard: string;
+  navProfile: string;
   navAssistant: string;
   navAdmin: string;
   loading: string;
@@ -62,6 +63,7 @@ const messages: Record<Locale, Messages> = {
       "Your Google account isn't linked to a SmartRoster profile yet. Please contact your administrator to be added.",
     signOut: "Sign out",
     navDashboard: "My schedule",
+    navProfile: "Profile",
     navAssistant: "Assistant",
     navAdmin: "Administration",
     loading: "Loading…",
@@ -97,6 +99,7 @@ const messages: Record<Locale, Messages> = {
     notRegisteredDescription: "你的 Google 帐号尚未关联 SmartRoster 个人资料，请联系管理员为你添加。",
     signOut: "登出",
     navDashboard: "我的排班",
+    navProfile: "个人资料",
     navAssistant: "助理",
     navAdmin: "管理",
     loading: "加载中……",

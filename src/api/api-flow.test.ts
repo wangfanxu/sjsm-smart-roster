@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { handleAvailabilityGet, handleAvailabilityPut } from "@/app/api/v1/me/availability/route";
 import { handleAssistantConfirmPost } from "@/app/api/v1/assistant/confirm/route";
 import { handleAssignmentsGet } from "@/app/api/v1/me/assignments/route";
+import { handleMePatch } from "@/app/api/v1/me/route";
 import {
   handlePlanningPeriodsPost,
 } from "@/app/api/v1/planning-periods/route";
@@ -883,6 +884,64 @@ describe("Sprint 1 protected API flow", () => {
 
   it("denies listing users to non-administrators", async () => {
     const response = await handleUsersGet(request("/api/v1/users"), dependencies());
+
+    expect(response.status).toBe(403);
+  });
+
+  it("lets a signed-in member update their own display name", async () => {
+    const response = await handleMePatch(
+      request("/api/v1/me", { method: "PATCH", body: JSON.stringify({ displayName: "New Name" }) }),
+      dependencies(),
+    );
+    const body = (await response.json()) as { user: { id: string; displayName: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.user.displayName).toBe("New Name");
+
+    const row = await pglite.query<{ display_name: string }>(`
+      SELECT display_name FROM users WHERE id = '${volunteerId}'
+    `);
+    expect(row.rows[0].display_name).toBe("New Name");
+  });
+
+  it("rejects updating your own display name to an empty value", async () => {
+    const response = await handleMePatch(
+      request("/api/v1/me", { method: "PATCH", body: JSON.stringify({ displayName: "  " }) }),
+      dependencies(),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("validation_error");
+  });
+
+  it("lets a member self-manage their own role capabilities", async () => {
+    const response = await handleMemberRolesPut(
+      request(`/api/v1/users/${volunteerId}/roles`, {
+        method: "PUT",
+        body: JSON.stringify({ capabilities: [{ roleId: drummerRoleId, proficiency: "secondary" }] }),
+      }),
+      { params: Promise.resolve({ userId: volunteerId }) },
+      dependencies(),
+    );
+
+    expect(response.status).toBe(200);
+
+    const row = await pglite.query<{ proficiency: string }>(`
+      SELECT proficiency FROM user_roles WHERE user_id = '${volunteerId}' AND role_id = '${drummerRoleId}'
+    `);
+    expect(row.rows).toEqual([{ proficiency: "secondary" }]);
+  });
+
+  it("denies a member from editing another member's role capabilities", async () => {
+    const response = await handleMemberRolesPut(
+      request(`/api/v1/users/${otherUserId}/roles`, {
+        method: "PUT",
+        body: JSON.stringify({ capabilities: [{ roleId: drummerRoleId, proficiency: "primary" }] }),
+      }),
+      { params: Promise.resolve({ userId: otherUserId }) },
+      dependencies(),
+    );
 
     expect(response.status).toBe(403);
   });

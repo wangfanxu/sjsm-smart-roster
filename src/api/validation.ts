@@ -66,6 +66,12 @@ export const createRoleInput = z
   })
   .strict();
 
+export const updateProfileInput = z
+  .object({
+    displayName: z.string().trim().min(1).max(160),
+  })
+  .strict();
+
 export const pendingUserInput = z
   .object({
     email: z.string().trim().toLowerCase().email().max(255),

@@ -229,7 +229,15 @@ export interface DomainRepository {
     input: PendingUserInput,
     actorUserId: string,
   ): Promise<{ id: string; email: string; displayName: string; systemRole: string }>;
+  updateDisplayName(
+    userId: string,
+    displayName: string,
+    actorUserId: string,
+  ): Promise<{ id: string; displayName: string }>;
   listUsersWithRoles(): Promise<UserWithRoles[]>;
+  getMemberRoles(
+    userId: string,
+  ): Promise<Array<{ roleId: string; roleName: string; proficiency: "primary" | "secondary" }>>;
   replaceMemberRoles(
     userId: string,
     capabilities: MemberRoleInput,

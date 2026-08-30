@@ -2,6 +2,8 @@ export type SystemRole = "volunteer" | "team_leader" | "administrator";
 
 export type Permission =
   | "profile:read:self"
+  | "profile:write:self"
+  | "profile:write:roles:self"
   | "assignment:read:self"
   | "availability:read:self"
   | "availability:write:self"

@@ -16,7 +16,9 @@ function repositoryStub(): DomainRepository {
     listRoles: vi.fn(),
     createRole: vi.fn(),
     createPendingUser: vi.fn(),
+    updateDisplayName: vi.fn(),
     listUsersWithRoles: vi.fn(),
+    getMemberRoles: vi.fn(),
     replaceMemberRoles: vi.fn(),
     listAvailability: vi.fn(),
     upsertAvailability: vi.fn(),
@@ -458,6 +460,17 @@ describe("SmartRosterService", () => {
       { slug: "drummer", name: "Drummer" },
       "administrator",
     );
+  });
+
+  it("delegates a self display-name update using the authenticated actor as both subject and actor", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.updateDisplayName).mockResolvedValue({ id: "volunteer", displayName: "New Name" });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.updateMyProfile("New Name", { userId: "volunteer" }),
+    ).resolves.toEqual({ id: "volunteer", displayName: "New Name" });
+    expect(repository.updateDisplayName).toHaveBeenCalledWith("volunteer", "New Name", "volunteer");
   });
 
   it("delegates listing users with their roles to the repository", async () => {

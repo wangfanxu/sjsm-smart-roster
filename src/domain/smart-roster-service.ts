@@ -121,6 +121,14 @@ export class SmartRosterService {
     return this.repository.createPendingUser(input, actor.userId);
   }
 
+  updateMyProfile(displayName: string, actor: Actor) {
+    return this.repository.updateDisplayName(actor.userId, displayName, actor.userId);
+  }
+
+  getMemberRoles(userId: string) {
+    return this.repository.getMemberRoles(userId);
+  }
+
   listUsers() {
     return this.repository.listUsersWithRoles();
   }

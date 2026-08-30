@@ -47,7 +47,7 @@ env:
   # flip back to "true" (or remove this line) and redeploy. Any value
   # other than the literal string "false" is treated as enabled.
   - variable: ROSTER_NOTIFICATIONS_ENABLED
-    value: "true"
+    value: "false"
     availability:
       - RUNTIME
 

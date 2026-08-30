@@ -48,6 +48,9 @@ export function AppShell({
           <Link href={`/${locale}/dashboard`}>{messages.navDashboard}</Link>
           <Link href={`/${locale}/profile`}>{messages.navProfile}</Link>
           <Link href={`/${locale}/assistant`}>{messages.navAssistant}</Link>
+          {profile.systemRole !== "volunteer" ? (
+            <Link href={`/${locale}/replacement-requests`}>{messages.navReplacementRequests}</Link>
+          ) : null}
           {profile.systemRole === "administrator" ? (
             <Link href={`/${locale}/admin`}>{messages.navAdmin}</Link>
           ) : null}

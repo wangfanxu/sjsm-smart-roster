@@ -1,0 +1,199 @@
+.page {
+  display: grid;
+  gap: 24px;
+}
+
+.pageHeader h1 {
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+.pageHeader p {
+  color: var(--muted);
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.statusMessage {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.errorBox {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid #f2c6c1;
+  border-radius: 14px;
+  background: #fbeceb;
+  color: #8a2c24;
+}
+
+.retryButton {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent-strong);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.retryButton:hover:not(:disabled),
+.retryButton:focus-visible:not(:disabled) {
+  background: var(--surface-muted);
+  outline: none;
+}
+
+.retryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.emptyState {
+  padding: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: var(--background);
+  color: var(--muted);
+  text-align: center;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.94rem;
+}
+
+.table th {
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--border);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.badgeOpen {
+  color: var(--accent-strong);
+  background: var(--surface-muted);
+}
+
+.badgeApproved {
+  color: #ffffff;
+  background: var(--accent);
+}
+
+.badgeDeclined,
+.badgeCancelled {
+  color: var(--muted);
+  background: #e6e6e6;
+}
+
+.actionsCell {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.reviewForm {
+  display: grid;
+  gap: 8px;
+}
+
+.reviewForm select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.reviewFormActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primaryButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 999px;
+  color: white;
+  background: var(--accent);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primaryButton:hover:not(:disabled),
+.primaryButton:focus-visible:not(:disabled) {
+  background: var(--accent-strong);
+  outline: none;
+}
+
+.primaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.dangerButton {
+  padding: 8px 16px;
+  border: 1px solid rgb(179 38 30 / 35%);
+  border-radius: 999px;
+  background: transparent;
+  color: #8c2019;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dangerButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}

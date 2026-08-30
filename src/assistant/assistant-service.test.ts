@@ -39,6 +39,14 @@ function repositoryStub(): DomainRepository {
     getOrCreateNotifications: vi.fn(),
     markNotificationSent: vi.fn(),
     markNotificationFailed: vi.fn(),
+    createReplacementRequest: vi.fn(),
+    listReplacementRequests: vi.fn(),
+    listMyReplacementRequests: vi.fn(),
+    getReplacementRequestDetail: vi.fn(),
+    getEligibleReplacementsForRequest: vi.fn(),
+    approveReplacementRequest: vi.fn(),
+    declineReplacementRequest: vi.fn(),
+    cancelReplacementRequest: vi.fn(),
   };
 }
 
@@ -58,6 +66,7 @@ describe("AssistantService", () => {
         startsAt: new Date("2026-09-05T01:00:00Z"),
         title: "Worship",
         role: "Drummer",
+        openReplacementRequestId: null,
       },
     ]);
     const rosterService = new SmartRosterService(repository, now);

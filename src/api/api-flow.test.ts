@@ -15,7 +15,8 @@ import {
   handleCandidatesPost,
 } from "@/app/api/v1/planning-periods/[periodId]/candidates/route";
 import { handleCandidateDetailGet } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/route";
-import { handleAssignmentLockPatch } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/assignments/[assignmentId]/route";
+import { handleAssignmentPatch } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/assignments/[assignmentId]/route";
+import { handleEligibleUsersGet } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/assignments/[assignmentId]/eligible-users/route";
 import { handleCandidateRegeneratePost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/regenerate/route";
 import { handleCandidatePublishPost } from "@/app/api/v1/planning-periods/[periodId]/candidates/[candidateId]/publish/route";
 import { handleAssistantAskPost } from "@/app/api/v1/assistant/ask/route";
@@ -151,7 +152,9 @@ describe("Sprint 1 protected API flow", () => {
         secondServiceId,
         drummerRoleId,
       ),
-    ).resolves.toEqual([{ userId: otherUserId, proficiency: "secondary" }]);
+    ).resolves.toEqual([
+      { userId: otherUserId, displayName: "Other", email: "other@example.test", proficiency: "secondary" },
+    ]);
   });
 
   it("rejects past availability dates", async () => {
@@ -747,6 +750,7 @@ describe("Sprint 1 protected API flow", () => {
 describe("Sprint 2 lock and regenerate flow", () => {
   const lockPeriodId = "00000000-0000-4000-a000-000000000105";
   const lockDrummerRoleId = "00000000-0000-4000-a000-000000000104";
+  const lockVocalistRoleId = "00000000-0000-4000-a000-000000000106";
   const lockFirstServiceId = "00000000-0000-4000-a000-000000000107";
   const lockSecondServiceId = "00000000-0000-4000-a000-000000000108";
   const lockAdminId = "00000000-0000-4000-a000-000000000101";
@@ -765,11 +769,14 @@ describe("Sprint 2 lock and regenerate flow", () => {
         ('${lockAdminId}', 'firebase-lock-admin', 'lock-admin@example.test', 'Lock Admin', 'administrator'),
         ('${lockVolunteerId}', 'firebase-lock-volunteer', 'lock-volunteer@example.test', 'Lock Volunteer', 'volunteer'),
         ('${lockOtherUserId}', 'firebase-lock-other', 'lock-other@example.test', 'Lock Other', 'volunteer');
-      INSERT INTO roles (id, slug, name)
-      VALUES ('${lockDrummerRoleId}', 'lock-drummer', 'Drummer');
+      INSERT INTO roles (id, slug, name) VALUES
+        ('${lockDrummerRoleId}', 'lock-drummer', 'Drummer'),
+        ('${lockVocalistRoleId}', 'lock-vocalist', 'Vocalist');
       INSERT INTO user_roles (user_id, role_id, proficiency) VALUES
         ('${lockVolunteerId}', '${lockDrummerRoleId}', 'primary'),
-        ('${lockOtherUserId}', '${lockDrummerRoleId}', 'secondary');
+        ('${lockOtherUserId}', '${lockDrummerRoleId}', 'secondary'),
+        ('${lockVolunteerId}', '${lockVocalistRoleId}', 'secondary'),
+        ('${lockOtherUserId}', '${lockVocalistRoleId}', 'secondary');
       INSERT INTO planning_periods (id, name, starts_on, ends_on, status, created_by)
       VALUES ('${lockPeriodId}', 'Winter', '2026-09-01', '2026-10-31', 'active', '${lockAdminId}');
       INSERT INTO services (id, planning_period_id, title, starts_at) VALUES
@@ -827,7 +834,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
     const draft = await generateDraft();
     const [assignmentToLock] = draft.assignments;
 
-    const response = await handleAssignmentLockPatch(
+    const response = await handleAssignmentPatch(
       request(
         `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignmentToLock.id}`,
         { method: "PATCH", body: JSON.stringify({ isLocked: true }) },
@@ -857,7 +864,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
     const draft = await generateDraft();
     const [assignmentToLock] = draft.assignments;
 
-    const response = await handleAssignmentLockPatch(
+    const response = await handleAssignmentPatch(
       request(
         `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignmentToLock.id}`,
         { method: "PATCH", body: JSON.stringify({ isLocked: true }) },
@@ -882,7 +889,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
       `UPDATE roster_candidates SET status = 'published' WHERE id = '${draft.candidate.id}'`,
     );
 
-    const response = await handleAssignmentLockPatch(
+    const response = await handleAssignmentPatch(
       request(
         `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignmentToLock.id}`,
         { method: "PATCH", body: JSON.stringify({ isLocked: true }) },
@@ -902,11 +909,166 @@ describe("Sprint 2 lock and regenerate flow", () => {
     expect(body.error.code).toBe("candidate_not_editable");
   });
 
+  it("lists eligible volunteers for an assignment's service and role", async () => {
+    const draft = await generateDraft();
+    const [assignment] = draft.assignments;
+
+    const response = await handleEligibleUsersGet(
+      request(
+        `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignment.id}/eligible-users`,
+      ),
+      {
+        params: Promise.resolve({
+          periodId: lockPeriodId,
+          candidateId: draft.candidate.id,
+          assignmentId: assignment.id,
+        }),
+      },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as {
+      eligibleUsers: Array<{ userId: string; displayName: string; email: string; proficiency: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.eligibleUsers.map((user) => user.userId).sort()).toEqual(
+      [lockVolunteerId, lockOtherUserId].sort(),
+    );
+  });
+
+  it("reassigns an assignment to an eligible volunteer, marking it manual and locked", async () => {
+    const draft = await generateDraft();
+    const [assignment] = draft.assignments;
+    const newUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+
+    const response = await handleAssignmentPatch(
+      request(
+        `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignment.id}`,
+        { method: "PATCH", body: JSON.stringify({ userId: newUserId }) },
+      ),
+      {
+        params: Promise.resolve({
+          periodId: lockPeriodId,
+          candidateId: draft.candidate.id,
+          assignmentId: assignment.id,
+        }),
+      },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as {
+      id: string;
+      userId: string;
+      isLocked: boolean;
+      source: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({ id: assignment.id, userId: newUserId, isLocked: true, source: "manual" });
+
+    const audited = await pglite.query<{ action: string }>(`
+      SELECT action FROM audit_events
+      WHERE entity_id = '${assignment.id}' AND action = 'assignment.reassigned'
+    `);
+    expect(audited.rows).toHaveLength(1);
+  });
+
+  it("rejects reassigning to a volunteer who is not eligible for the role", async () => {
+    const draft = await generateDraft();
+    const [assignment] = draft.assignments;
+
+    const response = await handleAssignmentPatch(
+      request(
+        `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignment.id}`,
+        { method: "PATCH", body: JSON.stringify({ userId: lockAdminId }) },
+      ),
+      {
+        params: Promise.resolve({
+          periodId: lockPeriodId,
+          candidateId: draft.candidate.id,
+          assignmentId: assignment.id,
+        }),
+      },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("ineligible_assignee");
+  });
+
+  it("rejects reassigning to a volunteer already filling another role for the same service", async () => {
+    const draft = await generateDraft();
+    const drummerAssignment = draft.assignments.find(
+      (item) => item.serviceId === lockFirstServiceId,
+    )!;
+    const otherEligibleUserId =
+      drummerAssignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+
+    const inserted = await pglite.query<{ id: string }>(`
+      INSERT INTO assignments (candidate_id, service_id, role_id, user_id, is_locked, source)
+      VALUES (
+        '${draft.candidate.id}', '${lockFirstServiceId}', '${lockVocalistRoleId}',
+        '${otherEligibleUserId}', false, 'solver'
+      )
+      RETURNING id
+    `);
+    const vocalistAssignmentId = inserted.rows[0].id;
+
+    const response = await handleAssignmentPatch(
+      request(
+        `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${vocalistAssignmentId}`,
+        { method: "PATCH", body: JSON.stringify({ userId: drummerAssignment.userId }) },
+      ),
+      {
+        params: Promise.resolve({
+          periodId: lockPeriodId,
+          candidateId: draft.candidate.id,
+          assignmentId: vocalistAssignmentId,
+        }),
+      },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("assignment_conflict");
+  });
+
+  it("rejects reassigning an assignment on a candidate that is no longer a draft", async () => {
+    const draft = await generateDraft();
+    const [assignment] = draft.assignments;
+    const newUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+    await pglite.exec(`
+      UPDATE roster_candidates SET status = 'superseded'
+      WHERE planning_period_id = '${lockPeriodId}' AND status = 'published';
+      UPDATE roster_candidates SET status = 'published' WHERE id = '${draft.candidate.id}';
+    `);
+
+    const response = await handleAssignmentPatch(
+      request(
+        `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignment.id}`,
+        { method: "PATCH", body: JSON.stringify({ userId: newUserId }) },
+      ),
+      {
+        params: Promise.resolve({
+          periodId: lockPeriodId,
+          candidateId: draft.candidate.id,
+          assignmentId: assignment.id,
+        }),
+      },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("candidate_not_editable");
+  });
+
   it("regenerates a candidate keeping the locked assignment and recalculating the rest", async () => {
     const draft = await generateDraft();
     const [assignmentToLock] = draft.assignments;
 
-    await handleAssignmentLockPatch(
+    await handleAssignmentPatch(
       request(
         `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignmentToLock.id}`,
         { method: "PATCH", body: JSON.stringify({ isLocked: true }) },
@@ -956,7 +1118,7 @@ describe("Sprint 2 lock and regenerate flow", () => {
     const draft = await generateDraft();
     const [assignmentToLock] = draft.assignments;
 
-    await handleAssignmentLockPatch(
+    await handleAssignmentPatch(
       request(
         `/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/assignments/${assignmentToLock.id}`,
         { method: "PATCH", body: JSON.stringify({ isLocked: true }) },

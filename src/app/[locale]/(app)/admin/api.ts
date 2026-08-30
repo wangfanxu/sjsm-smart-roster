@@ -2,6 +2,7 @@ import { apiFetch } from "@/lib/api-client";
 import type {
   CandidateDetail,
   CandidateSummary,
+  EligibleAssignee,
   GenerateCandidateResult,
   GenerationWeights,
   MemberUser,
@@ -89,6 +90,32 @@ export function setAssignmentLock(
     `/planning-periods/${periodId}/candidates/${candidateId}/assignments/${assignmentId}`,
     idToken,
     { method: "PATCH", body: JSON.stringify({ isLocked }) },
+  );
+}
+
+export function getEligibleAssignees(
+  idToken: string,
+  periodId: string,
+  candidateId: string,
+  assignmentId: string,
+): Promise<{ eligibleUsers: EligibleAssignee[] }> {
+  return apiFetch(
+    `/planning-periods/${periodId}/candidates/${candidateId}/assignments/${assignmentId}/eligible-users`,
+    idToken,
+  );
+}
+
+export function reassignAssignment(
+  idToken: string,
+  periodId: string,
+  candidateId: string,
+  assignmentId: string,
+  userId: string,
+): Promise<{ id: string; userId: string; isLocked: boolean; source: "solver" | "manual" }> {
+  return apiFetch(
+    `/planning-periods/${periodId}/candidates/${candidateId}/assignments/${assignmentId}`,
+    idToken,
+    { method: "PATCH", body: JSON.stringify({ userId }) },
   );
 }
 

@@ -186,6 +186,48 @@ export class SmartRosterService {
     return this.repository.setAssignmentLock(candidateId, assignmentId, isLocked, actor.userId);
   }
 
+  async getEligibleAssignees(planningPeriodId: string, candidateId: string, assignmentId: string) {
+    const detail = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!detail || detail.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+    const assignment = detail.assignments.find((item) => item.id === assignmentId);
+    if (!assignment) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+    return this.repository.listEligibleUsersForServiceRole(assignment.serviceId, assignment.roleId);
+  }
+
+  async updateAssignment(
+    planningPeriodId: string,
+    candidateId: string,
+    assignmentId: string,
+    input: Readonly<{ isLocked?: boolean; userId?: string }>,
+    actor: Actor,
+  ) {
+    const detail = await this.repository.getRosterCandidateDetail(candidateId);
+    if (!detail || detail.candidate.planningPeriodId !== planningPeriodId) {
+      throw new ApiError("roster_candidate_not_found", 404, "Roster candidate not found");
+    }
+    if (input.userId === undefined) {
+      return this.repository.setAssignmentLock(candidateId, assignmentId, input.isLocked!, actor.userId);
+    }
+    const assignment = detail.assignments.find((item) => item.id === assignmentId);
+    if (!assignment) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+    const eligible = await this.repository.listEligibleUsersForServiceRole(
+      assignment.serviceId,
+      assignment.roleId,
+    );
+    if (!eligible.some((candidateUser) => candidateUser.userId === input.userId)) {
+      throw new ApiError("ineligible_assignee", 400, "This volunteer is not eligible for this role");
+    }
+    return this.repository.reassignAssignment(
+      candidateId,
+      assignmentId,
+      input.userId,
+      input.isLocked ?? true,
+      actor.userId,
+    );
+  }
+
   async regenerateCandidate(
     planningPeriodId: string,
     candidateId: string,

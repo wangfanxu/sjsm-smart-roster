@@ -130,6 +130,13 @@ export type MemberRoleCapability = Readonly<{
   proficiency: Proficiency;
 }>;
 
+export type EligibleAssignee = Readonly<{
+  userId: string;
+  displayName: string;
+  email: string;
+  proficiency: Proficiency;
+}>;
+
 export type MemberUser = Readonly<{
   id: string;
   email: string;

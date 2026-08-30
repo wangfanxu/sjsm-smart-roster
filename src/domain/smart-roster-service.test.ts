@@ -23,6 +23,7 @@ function repositoryStub(): DomainRepository {
     listRosterCandidates: vi.fn(),
     getRosterCandidateDetail: vi.fn(),
     setAssignmentLock: vi.fn(),
+    reassignAssignment: vi.fn(),
     publishRosterCandidate: vi.fn(),
     getOrCreateNotifications: vi.fn(),
     markNotificationSent: vi.fn(),
@@ -207,6 +208,120 @@ describe("SmartRosterService", () => {
       service.setAssignmentLock("period", "candidate", "assignment", true, { userId: "administrator" }),
     ).rejects.toMatchObject({ code: "roster_candidate_not_found", status: 404 });
     expect(repository.setAssignmentLock).not.toHaveBeenCalled();
+  });
+
+  function draftCandidateDetailWithAssignment() {
+    return {
+      candidate: {
+        id: "candidate",
+        planningPeriodId: "period",
+        version: 1,
+        status: "draft" as const,
+        hardConstraintsSatisfied: true,
+        objectiveScore: "1000.0000",
+        configuration: {},
+        explanation: {},
+        generatedAt: new Date("2026-08-27T00:00:00Z"),
+      },
+      assignments: [
+        {
+          id: "assignment",
+          serviceId: "service",
+          serviceTitle: "Service",
+          serviceStartsAt: new Date("2026-09-05T01:00:00Z"),
+          roleId: "drummer",
+          roleName: "Drummer",
+          userId: "volunteer-1",
+          userDisplayName: "Volunteer One",
+          userEmail: "volunteer-1@example.test",
+          isLocked: false,
+          source: "solver" as const,
+        },
+      ],
+    };
+  }
+
+  it("delegates an isLocked-only assignment update to setAssignmentLock", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue(draftCandidateDetailWithAssignment());
+    vi.mocked(repository.setAssignmentLock).mockResolvedValue({ id: "assignment", isLocked: true });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.updateAssignment("period", "candidate", "assignment", { isLocked: true }, {
+        userId: "administrator",
+      }),
+    ).resolves.toEqual({ id: "assignment", isLocked: true });
+    expect(repository.setAssignmentLock).toHaveBeenCalledWith("candidate", "assignment", true, "administrator");
+    expect(repository.reassignAssignment).not.toHaveBeenCalled();
+  });
+
+  it("reassigns to an eligible volunteer, defaulting isLocked to true", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue(draftCandidateDetailWithAssignment());
+    vi.mocked(repository.listEligibleUsersForServiceRole).mockResolvedValue([
+      { userId: "volunteer-2", displayName: "Volunteer Two", email: "volunteer-2@example.test", proficiency: "secondary" },
+    ]);
+    vi.mocked(repository.reassignAssignment).mockResolvedValue({
+      id: "assignment",
+      userId: "volunteer-2",
+      isLocked: true,
+      source: "manual",
+    });
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.updateAssignment("period", "candidate", "assignment", { userId: "volunteer-2" }, {
+        userId: "administrator",
+      }),
+    ).resolves.toEqual({ id: "assignment", userId: "volunteer-2", isLocked: true, source: "manual" });
+    expect(repository.reassignAssignment).toHaveBeenCalledWith(
+      "candidate",
+      "assignment",
+      "volunteer-2",
+      true,
+      "administrator",
+    );
+  });
+
+  it("rejects reassigning to a volunteer who is not in the eligible list", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue(draftCandidateDetailWithAssignment());
+    vi.mocked(repository.listEligibleUsersForServiceRole).mockResolvedValue([]);
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.updateAssignment("period", "candidate", "assignment", { userId: "attacker" }, {
+        userId: "administrator",
+      }),
+    ).rejects.toMatchObject({ code: "ineligible_assignee", status: 400 });
+    expect(repository.reassignAssignment).not.toHaveBeenCalled();
+  });
+
+  it("delegates listing eligible assignees for a known assignment", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue(draftCandidateDetailWithAssignment());
+    vi.mocked(repository.listEligibleUsersForServiceRole).mockResolvedValue([
+      { userId: "volunteer-1", displayName: "Volunteer One", email: "volunteer-1@example.test", proficiency: "primary" },
+    ]);
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.getEligibleAssignees("period", "candidate", "assignment"),
+    ).resolves.toEqual([
+      { userId: "volunteer-1", displayName: "Volunteer One", email: "volunteer-1@example.test", proficiency: "primary" },
+    ]);
+    expect(repository.listEligibleUsersForServiceRole).toHaveBeenCalledWith("service", "drummer");
+  });
+
+  it("rejects listing eligible assignees for an unknown assignment id", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.getRosterCandidateDetail).mockResolvedValue(draftCandidateDetailWithAssignment());
+    const service = new SmartRosterService(repository, now);
+
+    await expect(
+      service.getEligibleAssignees("period", "candidate", "missing-assignment"),
+    ).rejects.toMatchObject({ code: "assignment_not_found", status: 404 });
   });
 
   it("reports infeasible locks as a structured error without persisting anything", async () => {

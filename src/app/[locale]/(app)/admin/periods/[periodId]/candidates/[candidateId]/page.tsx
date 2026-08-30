@@ -8,9 +8,11 @@ import { ApiRequestError } from "@/lib/api-client";
 import { useAuth } from "@/lib/auth-client";
 import {
   getCandidateDetail,
+  getEligibleAssignees,
   listRoles,
   listServices,
   publishCandidate,
+  reassignAssignment,
   regenerateCandidate,
   setAssignmentLock,
 } from "../../../../api";
@@ -20,7 +22,15 @@ import { formatDateTime } from "../../../../format";
 import { formatMessage, getAdminMessages, type AdminMessages } from "../../../../messages";
 import { StatusBadge } from "../../../../status-badge";
 import styles from "../../../../admin.module.css";
-import type { CandidateDetail, InfeasibleLock, InfeasibleLockReason, Role, Service } from "../../../../types";
+import type {
+  AssignmentDetail,
+  CandidateDetail,
+  EligibleAssignee,
+  InfeasibleLock,
+  InfeasibleLockReason,
+  Role,
+  Service,
+} from "../../../../types";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -116,6 +126,80 @@ export default function CandidateDetailPage() {
       setLockError(resolveApiErrorMessage(error, messages));
     } finally {
       setLockUpdatingId(null);
+    }
+  }
+
+  const [reassignTarget, setReassignTarget] = useState<AssignmentDetail | null>(null);
+  const [eligibleUsers, setEligibleUsers] = useState<EligibleAssignee[]>([]);
+  const [eligibleLoadState, setEligibleLoadState] = useState<LoadState>("loading");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [reassignError, setReassignError] = useState<string | null>(null);
+  const [reassignSuccess, setReassignSuccess] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
+
+  async function openReassignDialog(assignment: AssignmentDetail) {
+    setReassignTarget(assignment);
+    setReassignError(null);
+    setReassignSuccess(false);
+    setSelectedUserId("");
+    setEligibleLoadState("loading");
+    if (!idToken) return;
+    try {
+      const { eligibleUsers: fetched } = await getEligibleAssignees(
+        idToken,
+        periodId,
+        candidateId,
+        assignment.id,
+      );
+      setEligibleUsers([...fetched]);
+      setEligibleLoadState("ready");
+    } catch {
+      setEligibleLoadState("error");
+    }
+  }
+
+  function closeReassignDialog() {
+    setReassignTarget(null);
+  }
+
+  async function handleReassignSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!idToken || !reassignTarget || !selectedUserId) return;
+    setReassignError(null);
+    setReassigning(true);
+    try {
+      const result = await reassignAssignment(
+        idToken,
+        periodId,
+        candidateId,
+        reassignTarget.id,
+        selectedUserId,
+      );
+      const newDisplayName =
+        eligibleUsers.find((user) => user.userId === selectedUserId)?.displayName ?? "";
+      setDetail((previous) =>
+        previous
+          ? {
+              ...previous,
+              assignments: previous.assignments.map((assignment) =>
+                assignment.id === reassignTarget.id
+                  ? {
+                      ...assignment,
+                      userId: result.userId,
+                      userDisplayName: newDisplayName,
+                      isLocked: result.isLocked,
+                      source: result.source,
+                    }
+                  : assignment,
+              ),
+            }
+          : previous,
+      );
+      setReassignSuccess(true);
+    } catch (error) {
+      setReassignError(resolveApiErrorMessage(error, messages));
+    } finally {
+      setReassigning(false);
     }
   }
 
@@ -345,18 +429,27 @@ export default function CandidateDetailPage() {
                   </td>
                   {isDraft ? (
                     <td>
-                      <button
-                        type="button"
-                        className={styles.smallButton}
-                        disabled={lockUpdatingId === assignment.id}
-                        onClick={() => void handleToggleLock(assignment.id, !assignment.isLocked)}
-                      >
-                        {lockUpdatingId === assignment.id
-                          ? messages.updatingLock
-                          : assignment.isLocked
-                            ? messages.unlockButton
-                            : messages.lockButton}
-                      </button>
+                      <div className={styles.actionsRow}>
+                        <button
+                          type="button"
+                          className={styles.smallButton}
+                          disabled={lockUpdatingId === assignment.id}
+                          onClick={() => void handleToggleLock(assignment.id, !assignment.isLocked)}
+                        >
+                          {lockUpdatingId === assignment.id
+                            ? messages.updatingLock
+                            : assignment.isLocked
+                              ? messages.unlockButton
+                              : messages.lockButton}
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.smallButton}
+                          onClick={() => void openReassignDialog(assignment)}
+                        >
+                          {messages.reassignButton}
+                        </button>
+                      </div>
                     </td>
                   ) : null}
                 </tr>
@@ -436,6 +529,98 @@ export default function CandidateDetailPage() {
             </button>
           </div>
         </section>
+      ) : null}
+
+      {reassignTarget ? (
+        <div className={styles.dialogOverlay} role="presentation" onClick={closeReassignDialog}>
+          <div
+            className={styles.dialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reassign-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="reassign-heading" className={styles.panelHeading}>
+              {messages.reassignHeading}
+            </h2>
+            <p className={styles.panelIntro}>{messages.reassignIntro}</p>
+
+            {eligibleLoadState === "loading" ? <p role="status">{messages.loading}</p> : null}
+
+            {eligibleLoadState === "error" ? (
+              <div className={styles.errorBanner} role="alert">
+                <p>{messages.reassignLoadError}</p>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={() => void openReassignDialog(reassignTarget)}
+                >
+                  {messages.retry}
+                </button>
+              </div>
+            ) : null}
+
+            {eligibleLoadState === "ready" && eligibleUsers.length === 0 ? (
+              <p className={styles.emptyState}>{messages.reassignNoEligible}</p>
+            ) : null}
+
+            {eligibleLoadState === "ready" && eligibleUsers.length > 0 ? (
+              <form className={styles.form} onSubmit={(event) => void handleReassignSubmit(event)}>
+                <div className={styles.field}>
+                  <label htmlFor="reassign-user">{messages.reassignSelectLabel}</label>
+                  <select
+                    id="reassign-user"
+                    value={selectedUserId}
+                    onChange={(event) => setSelectedUserId(event.target.value)}
+                  >
+                    <option value="">{messages.reassignSelectPlaceholder}</option>
+                    {eligibleUsers.map((user) => (
+                      <option key={user.userId} value={user.userId}>
+                        {user.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {reassignError ? (
+                  <div className={styles.errorBanner} role="alert">
+                    <p>{reassignError}</p>
+                  </div>
+                ) : null}
+
+                {reassignSuccess ? (
+                  <div className={styles.successBanner}>
+                    <p>{messages.reassignSuccess}</p>
+                  </div>
+                ) : null}
+
+                <div className={styles.actionsRow}>
+                  <button
+                    type="submit"
+                    className={styles.primaryButton}
+                    disabled={reassigning || !selectedUserId}
+                  >
+                    {reassigning ? messages.reassigning : messages.reassignSubmit}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={closeReassignDialog}
+                    disabled={reassigning}
+                  >
+                    {messages.closeReassignDialog}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.actionsRow}>
+                <button type="button" className={styles.secondaryButton} onClick={closeReassignDialog}>
+                  {messages.closeReassignDialog}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       ) : null}
 
       {publishDialogOpen ? (

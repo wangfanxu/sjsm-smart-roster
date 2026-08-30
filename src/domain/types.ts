@@ -216,7 +216,14 @@ export interface DomainRepository {
   listEligibleUsersForServiceRole(
     serviceId: string,
     roleId: string,
-  ): Promise<Array<{ userId: string; proficiency: "primary" | "secondary" }>>;
+  ): Promise<
+    Array<{
+      userId: string;
+      displayName: string;
+      email: string;
+      proficiency: "primary" | "secondary";
+    }>
+  >;
   getRosterGenerationSource(planningPeriodId: string): Promise<RosterGenerationSource | null>;
   saveGeneratedCandidate(
     candidate: GeneratedCandidateDraft,
@@ -230,6 +237,13 @@ export interface DomainRepository {
     isLocked: boolean,
     actorUserId: string,
   ): Promise<{ id: string; isLocked: boolean }>;
+  reassignAssignment(
+    candidateId: string,
+    assignmentId: string,
+    userId: string,
+    isLocked: boolean,
+    actorUserId: string,
+  ): Promise<{ id: string; userId: string; isLocked: boolean; source: "solver" | "manual" }>;
   publishRosterCandidate(
     candidateId: string,
     actorUserId: string,

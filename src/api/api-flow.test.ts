@@ -9,6 +9,10 @@ import { handleAssignmentsGet } from "@/app/api/v1/me/assignments/route";
 import {
   handlePlanningPeriodsPost,
 } from "@/app/api/v1/planning-periods/route";
+import {
+  handlePlanningPeriodDelete,
+  handlePlanningPeriodPatch,
+} from "@/app/api/v1/planning-periods/[periodId]/route";
 import { handleServicesPost } from "@/app/api/v1/planning-periods/[periodId]/services/route";
 import {
   handleServiceDelete,
@@ -348,6 +352,81 @@ describe("Sprint 1 protected API flow", () => {
 
     expect(response.status).toBe(409);
     expect(body.error.code).toBe("service_has_published_assignments");
+  });
+
+  it("edits a planning period that has no published roster", async () => {
+    const { periodId: freshPeriodId } = await createServiceInFreshPeriod();
+
+    const response = await handlePlanningPeriodPatch(
+      request(`/api/v1/planning-periods/${freshPeriodId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Spring (Renamed)", startsOn: "2027-01-01", endsOn: "2027-02-28" }),
+      }),
+      { params: Promise.resolve({ periodId: freshPeriodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { planningPeriod: { name: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.planningPeriod.name).toBe("Spring (Renamed)");
+  });
+
+  it("deletes a planning period that has no published roster", async () => {
+    const { periodId: freshPeriodId } = await createServiceInFreshPeriod();
+
+    const response = await handlePlanningPeriodDelete(
+      request(`/api/v1/planning-periods/${freshPeriodId}`, { method: "DELETE" }),
+      { params: Promise.resolve({ periodId: freshPeriodId }) },
+      dependencies("firebase-admin"),
+    );
+
+    expect(response.status).toBe(200);
+    const row = await pglite.query(`SELECT id FROM planning_periods WHERE id = '${freshPeriodId}'`);
+    expect(row.rows).toHaveLength(0);
+  });
+
+  it("rejects shrinking a planning period's dates to exclude an existing service", async () => {
+    const { periodId: freshPeriodId } = await createServiceInFreshPeriod();
+
+    const response = await handlePlanningPeriodPatch(
+      request(`/api/v1/planning-periods/${freshPeriodId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Spring", startsOn: "2027-01-10", endsOn: "2027-02-28" }),
+      }),
+      { params: Promise.resolve({ periodId: freshPeriodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("period_shrink_excludes_services");
+  });
+
+  it("rejects editing a planning period that has a published roster", async () => {
+    const response = await handlePlanningPeriodPatch(
+      request(`/api/v1/planning-periods/${periodId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ name: "Should not apply", startsOn: "2026-09-01", endsOn: "2026-10-31" }),
+      }),
+      { params: Promise.resolve({ periodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("period_has_published_roster");
+  });
+
+  it("rejects deleting a planning period that has a published roster", async () => {
+    const response = await handlePlanningPeriodDelete(
+      request(`/api/v1/planning-periods/${periodId}`, { method: "DELETE" }),
+      { params: Promise.resolve({ periodId }) },
+      dependencies("firebase-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("period_has_published_roster");
   });
 
   it("denies planning writes to volunteers", async () => {

@@ -60,6 +60,14 @@ export class SmartRosterService {
     return this.repository.createPlanningPeriod(input, actor.userId);
   }
 
+  updatePlanningPeriod(planningPeriodId: string, input: PlanningPeriodInput, actor: Actor) {
+    return this.repository.updatePlanningPeriod(planningPeriodId, input, actor.userId);
+  }
+
+  deletePlanningPeriod(planningPeriodId: string, actor: Actor) {
+    return this.repository.deletePlanningPeriod(planningPeriodId, actor.userId);
+  }
+
   listServices(planningPeriodId: string) {
     return this.repository.listServices(planningPeriodId);
   }

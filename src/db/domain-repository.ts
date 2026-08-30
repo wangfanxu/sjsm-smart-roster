@@ -57,6 +57,103 @@ export function createDomainRepository(
       });
     },
 
+    async updatePlanningPeriod(planningPeriodId: string, input: PlanningPeriodInput, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: planningPeriods.id })
+          .from(planningPeriods)
+          .where(eq(planningPeriods.id, planningPeriodId))
+          .limit(1);
+        if (!existing) throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+
+        const [published] = await transaction
+          .select({ id: rosterCandidates.id })
+          .from(rosterCandidates)
+          .where(
+            and(eq(rosterCandidates.planningPeriodId, planningPeriodId), eq(rosterCandidates.status, "published")),
+          )
+          .limit(1);
+        if (published) {
+          throw new ApiError(
+            "period_has_published_roster",
+            409,
+            "This planning period has a published roster and cannot be changed",
+          );
+        }
+
+        const [outOfRange] = await transaction
+          .select({ id: services.id })
+          .from(services)
+          .where(
+            and(
+              eq(services.planningPeriodId, planningPeriodId),
+              or(
+                sql`(${services.startsAt} AT TIME ZONE 'Asia/Singapore')::date < ${input.startsOn}::date`,
+                sql`(${services.startsAt} AT TIME ZONE 'Asia/Singapore')::date > ${input.endsOn}::date`,
+              ),
+            ),
+          )
+          .limit(1);
+        if (outOfRange) {
+          throw new ApiError(
+            "period_shrink_excludes_services",
+            400,
+            "The new dates would exclude an existing service - edit or remove it first",
+          );
+        }
+
+        const [period] = await transaction
+          .update(planningPeriods)
+          .set({ name: input.name, startsOn: input.startsOn, endsOn: input.endsOn, updatedAt: new Date() })
+          .where(eq(planningPeriods.id, planningPeriodId))
+          .returning();
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "planning_period.updated",
+          entityType: "planning_period",
+          entityId: planningPeriodId,
+          metadata: { startsOn: input.startsOn, endsOn: input.endsOn },
+        });
+        return period;
+      });
+    },
+
+    async deletePlanningPeriod(planningPeriodId: string, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: planningPeriods.id })
+          .from(planningPeriods)
+          .where(eq(planningPeriods.id, planningPeriodId))
+          .limit(1);
+        if (!existing) throw new ApiError("planning_period_not_found", 404, "Planning period not found");
+
+        const [published] = await transaction
+          .select({ id: rosterCandidates.id })
+          .from(rosterCandidates)
+          .where(
+            and(eq(rosterCandidates.planningPeriodId, planningPeriodId), eq(rosterCandidates.status, "published")),
+          )
+          .limit(1);
+        if (published) {
+          throw new ApiError(
+            "period_has_published_roster",
+            409,
+            "This planning period has a published roster and cannot be deleted",
+          );
+        }
+
+        await transaction.delete(planningPeriods).where(eq(planningPeriods.id, planningPeriodId));
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "planning_period.deleted",
+          entityType: "planning_period",
+          entityId: planningPeriodId,
+          metadata: {},
+        });
+        return { id: planningPeriodId };
+      });
+    },
+
     async listServices(planningPeriodId: string) {
       const serviceRows = await database
         .select()

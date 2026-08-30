@@ -27,6 +27,21 @@ export function createPlanningPeriod(
   });
 }
 
+export function updatePlanningPeriod(
+  idToken: string,
+  periodId: string,
+  input: Readonly<{ name: string; startsOn: string; endsOn: string }>,
+): Promise<{ planningPeriod: PlanningPeriod }> {
+  return apiFetch(`/planning-periods/${periodId}`, idToken, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deletePlanningPeriod(idToken: string, periodId: string): Promise<{ id: string }> {
+  return apiFetch(`/planning-periods/${periodId}`, idToken, { method: "DELETE" });
+}
+
 export function listServices(idToken: string, periodId: string): Promise<{ services: Service[] }> {
   return apiFetch(`/planning-periods/${periodId}/services`, idToken);
 }

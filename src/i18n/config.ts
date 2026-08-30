@@ -38,18 +38,18 @@ const messages: Record<Locale, Messages> = {
     title: "Serving together, planned fairly.",
     description:
       "SmartRoster helps church coordinators build conflict-free volunteer rosters while keeping people—not algorithms—in control.",
-    principleTitle: "AI assists. People decide.",
+    principleTitle: "The algorithm suggests. People decide.",
     principleDescription:
       "Every suggestion is reviewable, every trade-off is explainable, and no roster is published without an authorized human.",
     status: "What's built",
     foundationTitle: "From availability to a published roster.",
     foundationDescription:
-      "SmartRoster now covers the full cycle: collecting availability, generating a fair draft roster with an explainable AI assistant, reviewing and adjusting it by hand, and publishing it with automatic notifications.",
+      "SmartRoster now covers the full cycle: collecting availability, generating a fair draft roster with an explainable scheduling engine, reviewing and adjusting it by hand, publishing it with automatic notifications, and letting volunteers ask a bilingual AI assistant about their own schedule.",
     foundationItems: [
-      "AI-assisted roster generation with fairness scoring",
+      "Explainable fair-scheduling engine (role fit, availability, workload balance)",
       "Manual review, locking, and reassignment before publishing",
       "Self-service availability and schedule for volunteers",
-      "Bilingual conversational assistant (English/Chinese)",
+      "AI conversational assistant for your own schedule (English/Chinese)",
     ],
     signInCta: "Sign in",
     signInTitle: "Sign in to SmartRoster",
@@ -74,18 +74,18 @@ const messages: Record<Locale, Messages> = {
     title: "一起服侍，公平安排。",
     description:
       "SmartRoster 帮助教会负责人建立无冲突的服侍表，同时确保最终决定始终掌握在人手中。",
-    principleTitle: "AI 提供协助，由人做决定。",
+    principleTitle: "系统提供建议，由人做决定。",
     principleDescription:
       "每个建议都可以审核，每项取舍都可以解释；未经授权负责人确认，系统不会发布排班。",
     status: "已实现功能",
     foundationTitle: "从可用时间到正式发布排班表，一站完成。",
     foundationDescription:
-      "SmartRoster 现已覆盖完整流程：收集可用时间、通过可解释的 AI 助手生成公平的排班草案、人工审核调整，再正式发布并自动通知。",
+      "SmartRoster 现已覆盖完整流程：收集可用时间、通过可解释的排班引擎生成公平的排班草案、人工审核调整、正式发布并自动通知，志愿者还可以用中英文双语 AI 助理查询自己的排班。",
     foundationItems: [
-      "AI 辅助生成排班表，兼顾公平性",
+      "可解释的公平排班引擎（角色匹配、可用时间、工作量均衡）",
       "发布前可人工审核、锁定、手动调整",
       "志愿者可自助设置可用时间、查看排班",
-      "中英文双语对话式助理",
+      "中英文双语 AI 助理，可查询自己的排班",
     ],
     signInCta: "登录",
     signInTitle: "登录 SmartRoster",

@@ -49,6 +49,33 @@ export function createService(
   });
 }
 
+export function updateService(
+  idToken: string,
+  periodId: string,
+  serviceId: string,
+  input: Readonly<{
+    title: string;
+    startsAt: string;
+    notes?: string | null;
+    requirements: ReadonlyArray<ServiceRequirementInput>;
+  }>,
+): Promise<{ service: Service }> {
+  return apiFetch(`/planning-periods/${periodId}/services/${serviceId}`, idToken, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteService(
+  idToken: string,
+  periodId: string,
+  serviceId: string,
+): Promise<{ id: string }> {
+  return apiFetch(`/planning-periods/${periodId}/services/${serviceId}`, idToken, {
+    method: "DELETE",
+  });
+}
+
 export function listRoles(idToken: string): Promise<{ roles: Role[] }> {
   return apiFetch("/roles", idToken);
 }

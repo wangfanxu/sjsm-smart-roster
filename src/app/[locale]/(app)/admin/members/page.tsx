@@ -247,57 +247,70 @@ export default function MembersPage() {
       </section>
 
       {selectedMember ? (
-        <section className={styles.panel}>
-          <h2 className={styles.panelHeading}>
-            {formatMessage(messages.manageRolesHeading, { name: selectedMember.displayName })}
-          </h2>
-          <p className={styles.panelIntro}>{messages.manageRolesIntro}</p>
+        <div className={styles.dialogOverlay} role="presentation" onClick={closeRoleEditor}>
+          <div
+            className={styles.dialogWide}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="manage-roles-heading"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="manage-roles-heading" className={styles.panelHeading}>
+              {formatMessage(messages.manageRolesHeading, { name: selectedMember.displayName })}
+            </h2>
+            <p className={styles.panelIntro}>{messages.manageRolesIntro}</p>
 
-          <form className={styles.form} onSubmit={(event) => void handleRolesSubmit(event)}>
-            <div className={styles.fieldGrid}>
-              {roles.map((role) => (
-                <div className={styles.field} key={role.id}>
-                  <label htmlFor={`role-${role.id}`}>{role.name}</label>
-                  <select
-                    id={`role-${role.id}`}
-                    value={selections[role.id] ?? "none"}
-                    onChange={(event) =>
-                      setSelections((previous) => ({
-                        ...previous,
-                        [role.id]: event.target.value as RoleSelection,
-                      }))
-                    }
-                  >
-                    <option value="none">{messages.roleCapabilityNone}</option>
-                    <option value="primary">{messages.roleCapabilityPrimary}</option>
-                    <option value="secondary">{messages.roleCapabilitySecondary}</option>
-                  </select>
+            <form className={styles.form} onSubmit={(event) => void handleRolesSubmit(event)}>
+              <div className={styles.fieldGrid}>
+                {roles.map((role) => (
+                  <div className={styles.field} key={role.id}>
+                    <label htmlFor={`role-${role.id}`}>{role.name}</label>
+                    <select
+                      id={`role-${role.id}`}
+                      value={selections[role.id] ?? "none"}
+                      onChange={(event) =>
+                        setSelections((previous) => ({
+                          ...previous,
+                          [role.id]: event.target.value as RoleSelection,
+                        }))
+                      }
+                    >
+                      <option value="none">{messages.roleCapabilityNone}</option>
+                      <option value="primary">{messages.roleCapabilityPrimary}</option>
+                      <option value="secondary">{messages.roleCapabilitySecondary}</option>
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {rolesError ? (
+                <div className={styles.errorBanner} role="alert">
+                  <p>{rolesError}</p>
                 </div>
-              ))}
-            </div>
+              ) : null}
 
-            {rolesError ? (
-              <div className={styles.errorBanner} role="alert">
-                <p>{rolesError}</p>
+              {rolesSuccess ? (
+                <div className={styles.successBanner}>
+                  <p>{messages.rolesUpdated}</p>
+                </div>
+              ) : null}
+
+              <div className={styles.actionsRow}>
+                <button type="submit" className={styles.primaryButton} disabled={savingRoles}>
+                  {savingRoles ? messages.savingRoles : messages.saveRolesSubmit}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={closeRoleEditor}
+                  disabled={savingRoles}
+                >
+                  {messages.closeRolesEditor}
+                </button>
               </div>
-            ) : null}
-
-            {rolesSuccess ? (
-              <div className={styles.successBanner}>
-                <p>{messages.rolesUpdated}</p>
-              </div>
-            ) : null}
-
-            <div className={styles.actionsRow}>
-              <button type="submit" className={styles.primaryButton} disabled={savingRoles}>
-                {savingRoles ? messages.savingRoles : messages.saveRolesSubmit}
-              </button>
-              <button type="button" className={styles.secondaryButton} onClick={closeRoleEditor} disabled={savingRoles}>
-                {messages.closeRolesEditor}
-              </button>
-            </div>
-          </form>
-        </section>
+            </form>
+          </div>
+        </div>
       ) : null}
 
       <section className={styles.panel}>

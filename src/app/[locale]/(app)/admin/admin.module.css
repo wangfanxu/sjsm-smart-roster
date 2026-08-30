@@ -359,6 +359,13 @@
   margin-top: 0;
 }
 
+.dialogWide {
+  composes: dialog;
+  width: min(640px, 100%);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
 .dialog p {
   color: var(--muted);
   line-height: 1.6;

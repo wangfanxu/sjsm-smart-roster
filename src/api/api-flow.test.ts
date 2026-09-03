@@ -28,6 +28,7 @@ import {
   handleServiceDelete,
   handleServicePatch,
 } from "@/app/api/v1/planning-periods/[periodId]/services/[serviceId]/route";
+import { handleServiceSongsPut } from "@/app/api/v1/services/[serviceId]/songs/route";
 import {
   handleCandidatesGet,
   handleCandidatesPost,
@@ -218,6 +219,75 @@ describe("Sprint 1 protected API flow", () => {
     });
   });
 
+  it("lets an administrator replace a published service's songs, and volunteers see them on their schedule", async () => {
+    const putResponse = await handleServiceSongsPut(
+      request(`/api/v1/services/${firstServiceId}/songs`, {
+        method: "PUT",
+        body: JSON.stringify({
+          songs: [
+            { title: "Amazing Grace" },
+            { title: "How Great Thou Art", youtubeLink: "https://www.youtube.com/watch?v=abc" },
+          ],
+          songsPrintingLink: "https://song.sjsmchinese.org/export-list-page?id=1",
+        }),
+      }),
+      { params: Promise.resolve({ serviceId: firstServiceId }) },
+      dependencies("firebase-admin"),
+    );
+    const putBody = (await putResponse.json()) as {
+      songs: Array<{ title: string; youtubeLink: string | null; order: number }>;
+      songsPrintingLink: string | null;
+    };
+
+    expect(putResponse.status).toBe(200);
+    expect(putBody.songs).toEqual([
+      expect.objectContaining({ title: "Amazing Grace", youtubeLink: null, order: 1 }),
+      expect.objectContaining({
+        title: "How Great Thou Art",
+        youtubeLink: "https://www.youtube.com/watch?v=abc",
+        order: 2,
+      }),
+    ]);
+    expect(putBody.songsPrintingLink).toBe("https://song.sjsmchinese.org/export-list-page?id=1");
+
+    const assignmentsResponse = await handleAssignmentsGet(
+      request("/api/v1/me/assignments"),
+      dependencies(),
+    );
+    const assignmentsBody = (await assignmentsResponse.json()) as {
+      assignments: Array<{
+        title: string;
+        songs: Array<{ title: string }>;
+        songsPrintingLink: string | null;
+      }>;
+    };
+    const firstServiceAssignment = assignmentsBody.assignments.find(
+      (assignment) => assignment.title === "First Service",
+    );
+    expect(firstServiceAssignment?.songs.map((song) => song.title)).toEqual([
+      "Amazing Grace",
+      "How Great Thou Art",
+    ]);
+    expect(firstServiceAssignment?.songsPrintingLink).toBe(
+      "https://song.sjsmchinese.org/export-list-page?id=1",
+    );
+  });
+
+  it("rejects a volunteer trying to manage a service's songs", async () => {
+    const response = await handleServiceSongsPut(
+      request(`/api/v1/services/${firstServiceId}/songs`, {
+        method: "PUT",
+        body: JSON.stringify({ songs: [{ title: "Should not save" }] }),
+      }),
+      { params: Promise.resolve({ serviceId: firstServiceId }) },
+      dependencies(),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("permission_denied");
+  });
+
   it("allows an administrator to create planning data and member capabilities atomically", async () => {
     const adminDependencies = dependencies("firebase-admin");
     const periodResponse = await handlePlanningPeriodsPost(
@@ -265,7 +335,7 @@ describe("Sprint 1 protected API flow", () => {
       FROM audit_events
       WHERE actor_user_id = '${adminId}'
     `);
-    expect(audit.rows[0].count).toBe(3);
+    expect(audit.rows[0].count).toBe(4);
   });
 
   async function createServiceInFreshPeriod() {

@@ -14,6 +14,7 @@ const teamLeaderPermissions = [
   ...volunteerPermissions,
   "team:read",
   "replacement:review",
+  "songs:manage",
 ] as const satisfies readonly Permission[];
 
 const administratorPermissions = [

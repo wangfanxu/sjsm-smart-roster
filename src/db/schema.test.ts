@@ -33,6 +33,7 @@ describe("initial PostgreSQL migration", () => {
       "roster_candidates",
       "scheduling_constraints",
       "service_role_requirements",
+      "service_songs",
       "services",
       "user_roles",
       "users",
@@ -78,6 +79,25 @@ describe("initial PostgreSQL migration", () => {
           '00000000-0000-0000-0000-000000000002',
           0
         );
+      `),
+    ).rejects.toThrow();
+
+    await expect(
+      database.exec(`
+        INSERT INTO service_songs (service_id, title, sort_order)
+        VALUES ('00000000-0000-0000-0000-000000000004', 'Amazing Grace', 0);
+      `),
+    ).rejects.toThrow();
+
+    await database.exec(`
+      INSERT INTO service_songs (service_id, title, sort_order)
+      VALUES ('00000000-0000-0000-0000-000000000004', 'Amazing Grace', 1);
+    `);
+
+    await expect(
+      database.exec(`
+        INSERT INTO service_songs (service_id, title, sort_order)
+        VALUES ('00000000-0000-0000-0000-000000000004', 'How Great Thou Art', 1);
       `),
     ).rejects.toThrow();
   });

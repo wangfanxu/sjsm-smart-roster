@@ -27,6 +27,26 @@ export type DashboardMessages = {
   cancellingCoverageRequest: string;
   cancelCoverageRequestError: string;
 
+  songsTitle: string;
+  songsEmpty: string;
+  songsManageButton: string;
+  songsWatchLink: string;
+  songsPrintingLinkLabel: string;
+  songsPrintingLinkOpen: string;
+  songsEditorHeading: string;
+  songsEditorTitleLabel: string;
+  songsEditorTitlePlaceholder: string;
+  songsEditorYoutubeLabel: string;
+  songsEditorRemoveButton: string;
+  songsEditorAddButton: string;
+  songsEditorPrintingLinkLabel: string;
+  songsEditorPrintingLinkPlaceholder: string;
+  songsEditorCancel: string;
+  songsEditorSave: string;
+  songsEditorSaving: string;
+  songsEditorError: string;
+  songsEditorInvalidLink: string;
+
   availabilityTitle: string;
   availabilityDescription: string;
   availabilityLoading: string;
@@ -76,6 +96,26 @@ const messages: Record<Locale, DashboardMessages> = {
     cancelCoverageRequestButton: "Cancel request",
     cancellingCoverageRequest: "Cancelling…",
     cancelCoverageRequestError: "We couldn't cancel your request.",
+
+    songsTitle: "Songs",
+    songsEmpty: "No songs added yet.",
+    songsManageButton: "Manage songs",
+    songsWatchLink: "Watch",
+    songsPrintingLinkLabel: "Printable songs",
+    songsPrintingLinkOpen: "Open",
+    songsEditorHeading: "Manage songs",
+    songsEditorTitleLabel: "Song title",
+    songsEditorTitlePlaceholder: "e.g. Amazing Grace",
+    songsEditorYoutubeLabel: "YouTube link (optional)",
+    songsEditorRemoveButton: "Remove",
+    songsEditorAddButton: "Add song",
+    songsEditorPrintingLinkLabel: "Printable songs link (optional)",
+    songsEditorPrintingLinkPlaceholder: "e.g. https://song.sjsmchinese.org/export-list-page?...",
+    songsEditorCancel: "Cancel",
+    songsEditorSave: "Save",
+    songsEditorSaving: "Saving…",
+    songsEditorError: "We couldn't save the songs.",
+    songsEditorInvalidLink: "Enter a valid link starting with http:// or https://",
 
     availabilityTitle: "Availability",
     availabilityDescription:
@@ -128,6 +168,26 @@ const messages: Record<Locale, DashboardMessages> = {
     cancelCoverageRequestButton: "撤销申请",
     cancellingCoverageRequest: "撤销中……",
     cancelCoverageRequestError: "无法撤销你的申请。",
+
+    songsTitle: "诗歌",
+    songsEmpty: "尚未添加诗歌。",
+    songsManageButton: "管理诗歌",
+    songsWatchLink: "观看",
+    songsPrintingLinkLabel: "诗歌歌单",
+    songsPrintingLinkOpen: "打开",
+    songsEditorHeading: "管理诗歌",
+    songsEditorTitleLabel: "诗歌名称",
+    songsEditorTitlePlaceholder: "例如：奇异恩典",
+    songsEditorYoutubeLabel: "YouTube 链接（可选）",
+    songsEditorRemoveButton: "移除",
+    songsEditorAddButton: "添加诗歌",
+    songsEditorPrintingLinkLabel: "诗歌歌单链接（可选）",
+    songsEditorPrintingLinkPlaceholder: "例如：https://song.sjsmchinese.org/export-list-page?...",
+    songsEditorCancel: "取消",
+    songsEditorSave: "保存",
+    songsEditorSaving: "保存中……",
+    songsEditorError: "无法保存诗歌。",
+    songsEditorInvalidLink: "请输入以 http:// 或 https:// 开头的有效链接",
 
     availabilityTitle: "可用时间",
     availabilityDescription: "告诉团队你哪些日期方便服侍。在日期到来之前，你可以随时更新。",

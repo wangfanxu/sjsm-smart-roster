@@ -25,6 +25,8 @@ function repositoryStub(): DomainRepository {
     upsertAvailability: vi.fn(),
     listUpcomingAssignments: vi.fn(),
     listServiceTeammates: vi.fn().mockResolvedValue([]),
+    listServiceSongs: vi.fn().mockResolvedValue([]),
+    replaceServiceSongs: vi.fn(),
     listEligibleUsersForServiceRole: vi.fn(),
     getRosterGenerationSource: vi.fn(),
     saveGeneratedCandidate: vi.fn(),

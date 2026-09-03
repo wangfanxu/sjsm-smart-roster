@@ -52,6 +52,20 @@ export const serviceInput = z.object({
     }),
 });
 
+export const serviceSongsInput = z
+  .object({
+    songs: z
+      .array(
+        z.object({
+          title: z.string().trim().min(1).max(200),
+          youtubeLink: z.url().max(500).nullable().optional(),
+        }),
+      )
+      .max(50),
+    songsPrintingLink: z.url().max(500).nullable().optional(),
+  })
+  .strict();
+
 export const createRoleInput = z
   .object({
     slug: z

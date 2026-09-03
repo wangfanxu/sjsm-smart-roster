@@ -6,8 +6,9 @@ import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import styles from "./dashboard.module.css";
 import { formatServiceDateTime, sortAssignmentsChronologically } from "./date-utils";
 import { getDashboardMessages } from "./messages";
+import { SongsEditor } from "./SongsEditor";
 import { groupTeammatesByRole } from "./teammates-utils";
-import type { Assignment } from "./types";
+import type { Assignment, Song } from "./types";
 
 type AssignmentsState =
   | { status: "loading" }
@@ -17,7 +18,8 @@ type AssignmentsState =
 export function AssignmentsSection({
   idToken,
   locale,
-}: Readonly<{ idToken: string; locale: Locale }>) {
+  canManageSongs = false,
+}: Readonly<{ idToken: string; locale: Locale; canManageSongs?: boolean }>) {
   const messages = getDashboardMessages(locale);
   const [state, setState] = useState<AssignmentsState>({ status: "loading" });
   const [reloadToken, setReloadToken] = useState(0);
@@ -27,6 +29,7 @@ export function AssignmentsSection({
   const [submittingRequestFor, setSubmittingRequestFor] = useState<string | null>(null);
   const [cancellingRequestFor, setCancellingRequestFor] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [songsEditorOpenForService, setSongsEditorOpenForService] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +61,23 @@ export function AssignmentsSection({
             status: "ready",
             assignments: previous.assignments.map((entry) =>
               entry.assignmentId === assignmentId ? { ...entry, ...patch } : entry,
+            ),
+          }
+        : previous,
+    );
+  }
+
+  function updateAssignmentSongsForService(
+    serviceId: string,
+    songs: ReadonlyArray<Song>,
+    songsPrintingLink: string | null,
+  ) {
+    setState((previous) =>
+      previous.status === "ready"
+        ? {
+            status: "ready",
+            assignments: previous.assignments.map((entry) =>
+              entry.serviceId === serviceId ? { ...entry, songs, songsPrintingLink } : entry,
             ),
           }
         : previous,
@@ -161,6 +181,64 @@ export function AssignmentsSection({
                       .map((group) => `${group.role} — ${group.names.join(", ")}`)
                       .join(" · ")}
                   </span>
+                ) : null}
+
+                <div className={styles.songsSection}>
+                  <div className={styles.songsHeader}>
+                    <strong>{messages.songsTitle}</strong>
+                    {canManageSongs ? (
+                      <button
+                        type="button"
+                        className={styles.retryButton}
+                        onClick={() => setSongsEditorOpenForService(assignment.serviceId)}
+                      >
+                        {messages.songsManageButton}
+                      </button>
+                    ) : null}
+                  </div>
+                  {assignment.songs.length > 0 ? (
+                    <ol className={styles.songsList}>
+                      {assignment.songs.map((song) => (
+                        <li key={song.id}>
+                          <span>{song.title}</span>
+                          {song.youtubeLink ? (
+                            <a href={song.youtubeLink} target="_blank" rel="noreferrer">
+                              {messages.songsWatchLink}
+                            </a>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className={styles.songsEmpty}>{messages.songsEmpty}</p>
+                  )}
+                  {assignment.songsPrintingLink ? (
+                    <p className={styles.songsPrintingLink}>
+                      {messages.songsPrintingLinkLabel}:{" "}
+                      <a href={assignment.songsPrintingLink} target="_blank" rel="noreferrer">
+                        {messages.songsPrintingLinkOpen}
+                      </a>
+                    </p>
+                  ) : null}
+                </div>
+
+                {songsEditorOpenForService === assignment.serviceId ? (
+                  <SongsEditor
+                    idToken={idToken}
+                    locale={locale}
+                    serviceId={assignment.serviceId}
+                    songs={assignment.songs}
+                    songsPrintingLink={assignment.songsPrintingLink}
+                    onClose={() => setSongsEditorOpenForService(null)}
+                    onSaved={(result) => {
+                      updateAssignmentSongsForService(
+                        assignment.serviceId,
+                        result.songs,
+                        result.songsPrintingLink,
+                      );
+                      setSongsEditorOpenForService(null);
+                    }}
+                  />
                 ) : null}
 
                 {assignment.openReplacementRequestId ? (

@@ -10,6 +10,7 @@ export type Permission =
   | "replacement:create:self"
   | "team:read"
   | "replacement:review"
+  | "songs:manage"
   | "planning:manage"
   | "roster:generate"
   | "roster:review"

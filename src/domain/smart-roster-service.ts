@@ -328,4 +328,32 @@ export class SmartRosterService {
     }
     return this.repository.publishRosterCandidate(candidateId, actor.userId);
   }
+
+  requestReplacement(assignmentId: string, reason: string | null | undefined, actor: Actor) {
+    return this.repository.createReplacementRequest(assignmentId, actor.userId, reason ?? null);
+  }
+
+  listReplacementRequests() {
+    return this.repository.listReplacementRequests();
+  }
+
+  listMyReplacementRequests(actor: Actor) {
+    return this.repository.listMyReplacementRequests(actor.userId);
+  }
+
+  getEligibleReplacements(requestId: string) {
+    return this.repository.getEligibleReplacementsForRequest(requestId);
+  }
+
+  approveReplacementRequest(requestId: string, replacementUserId: string, actor: Actor) {
+    return this.repository.approveReplacementRequest(requestId, replacementUserId, actor.userId);
+  }
+
+  declineReplacementRequest(requestId: string, actor: Actor) {
+    return this.repository.declineReplacementRequest(requestId, actor.userId);
+  }
+
+  cancelReplacementRequest(requestId: string, actor: Actor) {
+    return this.repository.cancelReplacementRequest(requestId, actor.userId);
+  }
 }

@@ -7,6 +7,15 @@ import { handleAvailabilityGet, handleAvailabilityPut } from "@/app/api/v1/me/av
 import { handleAssistantConfirmPost } from "@/app/api/v1/assistant/confirm/route";
 import { handleAssignmentsGet } from "@/app/api/v1/me/assignments/route";
 import { handleMePatch } from "@/app/api/v1/me/route";
+import { handleMyReplacementRequestsGet } from "@/app/api/v1/me/replacement-requests/route";
+import {
+  handleReplacementRequestsGet,
+  handleReplacementRequestsPost,
+} from "@/app/api/v1/replacement-requests/route";
+import { handleReplacementEligibleUsersGet } from "@/app/api/v1/replacement-requests/[requestId]/eligible-users/route";
+import { handleReplacementApprovePost } from "@/app/api/v1/replacement-requests/[requestId]/approve/route";
+import { handleReplacementDeclinePost } from "@/app/api/v1/replacement-requests/[requestId]/decline/route";
+import { handleReplacementCancelPost } from "@/app/api/v1/replacement-requests/[requestId]/cancel/route";
 import {
   handlePlanningPeriodsPost,
 } from "@/app/api/v1/planning-periods/route";
@@ -1523,6 +1532,424 @@ describe("Sprint 2 lock and regenerate flow", () => {
     expect(vocalistOwnAssignment.teammates).toEqual([
       expect.objectContaining({ userId: drummerAssignment.userId, role: "Drummer" }),
     ]);
+  });
+
+  async function publishedDraft() {
+    const draft = await generateDraft();
+    const publishResponse = await handleCandidatePublishPost(
+      request(`/api/v1/planning-periods/${lockPeriodId}/candidates/${draft.candidate.id}/publish`, {
+        method: "POST",
+      }),
+      { params: Promise.resolve({ periodId: lockPeriodId, candidateId: draft.candidate.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    expect(publishResponse.status).toBe(200);
+    return draft;
+  }
+
+  it("lets the assigned volunteer request a replacement for a published assignment", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+
+    const response = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id, reason: "Traveling" }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const body = (await response.json()) as {
+      replacementRequest: { id: string; status: string; assignmentId: string; reason: string };
+    };
+
+    expect(response.status).toBe(201);
+    expect(body.replacementRequest).toMatchObject({
+      assignmentId: assignment.id,
+      status: "open",
+      reason: "Traveling",
+    });
+  });
+
+  it("rejects requesting a replacement for someone else's assignment", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const otherUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+
+    const response = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[otherUserId]),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("not_your_assignment");
+  });
+
+  it("rejects requesting a replacement for an assignment that is not yet published", async () => {
+    const draft = await generateDraft();
+    const [assignment] = draft.assignments;
+
+    const response = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("assignment_not_published");
+  });
+
+  it("rejects a duplicate open replacement request for the same assignment", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const requesterDependencies = dependencies(firebaseUidByUserId[assignment.userId]);
+    const createBody = JSON.stringify({ assignmentId: assignment.id });
+
+    await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", { method: "POST", body: createBody }),
+      requesterDependencies,
+    );
+    const response = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", { method: "POST", body: createBody }),
+      requesterDependencies,
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("replacement_request_already_open");
+  });
+
+  it("lists the review queue for an administrator and denies volunteers", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+
+    const adminResponse = await handleReplacementRequestsGet(
+      request("/api/v1/replacement-requests"),
+      dependencies("firebase-lock-admin"),
+    );
+    const adminBody = (await adminResponse.json()) as {
+      replacementRequests: Array<{ assignmentId: string }>;
+    };
+    expect(adminResponse.status).toBe(200);
+    expect(adminBody.replacementRequests).toEqual(
+      expect.arrayContaining([expect.objectContaining({ assignmentId: assignment.id })]),
+    );
+
+    const volunteerResponse = await handleReplacementRequestsGet(
+      request("/api/v1/replacement-requests"),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    expect(volunteerResponse.status).toBe(403);
+  });
+
+  it("lets the requester see their own replacement requests", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+
+    const response = await handleMyReplacementRequestsGet(
+      request("/api/v1/me/replacement-requests"),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const body = (await response.json()) as {
+      replacementRequests: Array<{ assignmentId: string; requesterId: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.replacementRequests).toEqual(
+      expect.arrayContaining([expect.objectContaining({ assignmentId: assignment.id })]),
+    );
+    expect(body.replacementRequests.every((entry) => entry.requesterId === assignment.userId)).toBe(true);
+  });
+
+  it("lists eligible replacements for a review", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const otherUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementEligibleUsersGet(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/eligible-users`),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { eligibleUsers: Array<{ userId: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.eligibleUsers.map((user) => user.userId)).toEqual([otherUserId]);
+  });
+
+  it("approves a replacement request, reassigns the assignment, and emails both parties", async () => {
+    const emailSender = fakeEmailSender();
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const replacementUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId], emailSender),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementApprovePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId }),
+      }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin", emailSender),
+    );
+    const body = (await response.json()) as { replacementRequest: { status: string; replacementUserId: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.replacementRequest).toMatchObject({ status: "approved", replacementUserId });
+
+    const assignmentRow = await pglite.query<{ user_id: string; source: string }>(`
+      SELECT user_id, source FROM assignments WHERE id = '${assignment.id}'
+    `);
+    expect(assignmentRow.rows[0]).toEqual({ user_id: replacementUserId, source: "manual" });
+    expect(emailSender.send).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects approving with a volunteer who is not eligible for the role", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementApprovePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId: lockAdminId }),
+      }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(400);
+    expect(body.error.code).toBe("ineligible_assignee");
+  });
+
+  it("rejects approving with a volunteer already filling another role for the same service", async () => {
+    const draft = await publishedDraft();
+    const drummerAssignment = draft.assignments.find((item) => item.serviceId === lockFirstServiceId)!;
+    const vocalistUserId =
+      drummerAssignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+
+    const inserted = await pglite.query<{ id: string }>(`
+      INSERT INTO assignments (candidate_id, service_id, role_id, user_id, is_locked, source)
+      VALUES (
+        '${draft.candidate.id}', '${lockFirstServiceId}', '${lockVocalistRoleId}',
+        '${vocalistUserId}', false, 'solver'
+      )
+      RETURNING id
+    `);
+    const vocalistAssignmentId = inserted.rows[0].id;
+
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: vocalistAssignmentId }),
+      }),
+      dependencies(firebaseUidByUserId[vocalistUserId]),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementApprovePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId: drummerAssignment.userId }),
+      }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("assignment_conflict");
+  });
+
+  it("declines a replacement request and emails only the requester", async () => {
+    const emailSender = fakeEmailSender();
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId], emailSender),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementDeclinePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/decline`, { method: "POST" }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin", emailSender),
+    );
+    const body = (await response.json()) as { replacementRequest: { status: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.replacementRequest.status).toBe("declined");
+    expect(emailSender.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects approving or declining a replacement request that is no longer open", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const replacementUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    await handleReplacementDeclinePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/decline`, { method: "POST" }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+
+    const response = await handleReplacementApprovePost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ replacementUserId }),
+      }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies("firebase-lock-admin"),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(409);
+    expect(body.error.code).toBe("replacement_request_not_open");
+  });
+
+  it("lets the requester cancel their own open replacement request", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const requesterDependencies = dependencies(firebaseUidByUserId[assignment.userId]);
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      requesterDependencies,
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementCancelPost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/cancel`, { method: "POST" }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      requesterDependencies,
+    );
+    const body = (await response.json()) as { replacementRequest: { status: string } };
+
+    expect(response.status).toBe(200);
+    expect(body.replacementRequest.status).toBe("cancelled");
+  });
+
+  it("rejects cancelling someone else's replacement request", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const otherUserId = assignment.userId === lockVolunteerId ? lockOtherUserId : lockVolunteerId;
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      dependencies(firebaseUidByUserId[assignment.userId]),
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const response = await handleReplacementCancelPost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/cancel`, { method: "POST" }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      dependencies(firebaseUidByUserId[otherUserId]),
+    );
+    const body = (await response.json()) as { error: { code: string } };
+
+    expect(response.status).toBe(403);
+    expect(body.error.code).toBe("not_your_replacement_request");
+  });
+
+  it("surfaces an open replacement request on the assignment, and clears it once cancelled", async () => {
+    const draft = await publishedDraft();
+    const [assignment] = draft.assignments;
+    const requesterDependencies = dependencies(firebaseUidByUserId[assignment.userId]);
+    type AssignmentsResponse = {
+      assignments: Array<{ assignmentId: string; openReplacementRequestId: string | null }>;
+    };
+
+    const beforeResponse = await handleAssignmentsGet(request("/api/v1/me/assignments"), requesterDependencies);
+    const beforeBody = (await beforeResponse.json()) as AssignmentsResponse;
+    expect(
+      beforeBody.assignments.find((entry) => entry.assignmentId === assignment.id)?.openReplacementRequestId,
+    ).toBeNull();
+
+    const createResponse = await handleReplacementRequestsPost(
+      request("/api/v1/replacement-requests", {
+        method: "POST",
+        body: JSON.stringify({ assignmentId: assignment.id }),
+      }),
+      requesterDependencies,
+    );
+    const { replacementRequest } = (await createResponse.json()) as { replacementRequest: { id: string } };
+
+    const duringResponse = await handleAssignmentsGet(request("/api/v1/me/assignments"), requesterDependencies);
+    const duringBody = (await duringResponse.json()) as AssignmentsResponse;
+    expect(duringBody.assignments.find((entry) => entry.assignmentId === assignment.id)?.openReplacementRequestId).toBe(
+      replacementRequest.id,
+    );
+
+    await handleReplacementCancelPost(
+      request(`/api/v1/replacement-requests/${replacementRequest.id}/cancel`, { method: "POST" }),
+      { params: Promise.resolve({ requestId: replacementRequest.id }) },
+      requesterDependencies,
+    );
+
+    const afterResponse = await handleAssignmentsGet(request("/api/v1/me/assignments"), requesterDependencies);
+    const afterBody = (await afterResponse.json()) as AssignmentsResponse;
+    expect(
+      afterBody.assignments.find((entry) => entry.assignmentId === assignment.id)?.openReplacementRequestId,
+    ).toBeNull();
   });
 
   it("denies publishing to volunteers", async () => {

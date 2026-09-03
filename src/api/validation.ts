@@ -72,6 +72,19 @@ export const updateProfileInput = z
   })
   .strict();
 
+export const createReplacementRequestInput = z
+  .object({
+    assignmentId: z.uuid(),
+    reason: z.string().trim().max(500).nullable().optional(),
+  })
+  .strict();
+
+export const approveReplacementRequestInput = z
+  .object({
+    replacementUserId: z.uuid(),
+  })
+  .strict();
+
 export const pendingUserInput = z
   .object({
     email: z.string().trim().toLowerCase().email().max(255),

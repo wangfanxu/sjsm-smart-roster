@@ -135,6 +135,47 @@
   font-size: 0.88rem;
 }
 
+.coverageRequestRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  grid-column: 1 / 3;
+}
+
+.coverageRequestedLabel {
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.coverageRequestForm {
+  display: grid;
+  gap: 8px;
+  grid-column: 1 / 3;
+}
+
+.coverageRequestForm label {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.coverageRequestForm textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  resize: vertical;
+}
+
+.coverageRequestActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .availabilityList {
   display: grid;
   gap: 10px;

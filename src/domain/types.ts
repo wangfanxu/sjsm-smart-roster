@@ -1,5 +1,26 @@
 import type { AuthenticatedPrincipal } from "@/auth/types";
 
+export type ReplacementRequestStatus = "open" | "approved" | "declined" | "cancelled";
+
+export type ReplacementRequestSummary = Readonly<{
+  id: string;
+  assignmentId: string;
+  status: ReplacementRequestStatus;
+  reason: string | null;
+  requesterId: string;
+  requesterDisplayName: string;
+  requesterEmail: string;
+  replacementUserId: string | null;
+  replacementDisplayName: string | null;
+  replacementEmail: string | null;
+  serviceId: string;
+  serviceTitle: string;
+  serviceStartsAt: Date;
+  roleId: string;
+  roleName: string;
+  createdAt: Date;
+}>;
+
 export type PlanningPeriodInput = Readonly<{
   name: string;
   startsOn: string;
@@ -256,6 +277,7 @@ export interface DomainRepository {
       startsAt: Date;
       title: string;
       role: string;
+      openReplacementRequestId: string | null;
     }>
   >;
   listServiceTeammates(serviceIds: ReadonlyArray<string>): Promise<
@@ -308,6 +330,24 @@ export interface DomainRepository {
   ): Promise<NotificationDelivery[]>;
   markNotificationSent(notificationId: string, providerMessageId: string): Promise<void>;
   markNotificationFailed(notificationId: string, error: string): Promise<void>;
+  createReplacementRequest(
+    assignmentId: string,
+    requesterId: string,
+    reason: string | null,
+  ): Promise<ReplacementRequestSummary>;
+  listReplacementRequests(): Promise<ReplacementRequestSummary[]>;
+  listMyReplacementRequests(requesterId: string): Promise<ReplacementRequestSummary[]>;
+  getReplacementRequestDetail(requestId: string): Promise<ReplacementRequestSummary | null>;
+  getEligibleReplacementsForRequest(requestId: string): Promise<
+    Array<{ userId: string; displayName: string; email: string; proficiency: "primary" | "secondary" }>
+  >;
+  approveReplacementRequest(
+    requestId: string,
+    replacementUserId: string,
+    reviewerId: string,
+  ): Promise<ReplacementRequestSummary>;
+  declineReplacementRequest(requestId: string, reviewerId: string): Promise<ReplacementRequestSummary>;
+  cancelReplacementRequest(requestId: string, requesterId: string): Promise<ReplacementRequestSummary>;
 }
 
 export type Actor = Pick<AuthenticatedPrincipal, "userId">;

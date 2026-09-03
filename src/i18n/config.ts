@@ -26,6 +26,7 @@ type Messages = {
   navDashboard: string;
   navProfile: string;
   navAssistant: string;
+  navReplacementRequests: string;
   navAdmin: string;
   loading: string;
   comingSoon: string;
@@ -64,6 +65,7 @@ const messages: Record<Locale, Messages> = {
     signOut: "Sign out",
     navDashboard: "My schedule",
     navProfile: "Profile",
+    navReplacementRequests: "Coverage requests",
     navAssistant: "Assistant",
     navAdmin: "Administration",
     loading: "Loading…",
@@ -100,6 +102,7 @@ const messages: Record<Locale, Messages> = {
     signOut: "登出",
     navDashboard: "我的排班",
     navProfile: "个人资料",
+    navReplacementRequests: "换班申请",
     navAssistant: "助理",
     navAdmin: "管理",
     loading: "加载中……",

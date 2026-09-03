@@ -13,6 +13,7 @@ export type Assignment = Readonly<{
   title: string;
   role: string;
   teammates: ReadonlyArray<Teammate>;
+  openReplacementRequestId: string | null;
 }>;
 
 export type AvailabilityStatus = "available" | "unavailable" | "preferred";

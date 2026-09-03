@@ -56,3 +56,70 @@ export function rosterPublishedBody(
 
   return `${en}\n\n---\n\n${zh}`;
 }
+
+export function replacementApprovedRequesterSubject(): string {
+  return "Your replacement request was approved / 你的换班申请已获批准";
+}
+
+export function replacementApprovedRequesterBody(
+  requesterName: string,
+  replacementName: string,
+  assignment: NotificationAssignment,
+): string {
+  const en = [
+    `Hi ${requesterName},`,
+    "",
+    `Your request for coverage on ${assignmentLineEn(assignment).slice(2)} has been approved.`,
+    `${replacementName} will take your place.`,
+  ].join("\n");
+  const zh = [
+    `${requesterName}你好，`,
+    "",
+    `你在${assignmentLineZh(assignment).slice(2)}的换班申请已获批准。`,
+    `${replacementName} 将代替你服侍。`,
+  ].join("\n");
+  return `${en}\n\n---\n\n${zh}`;
+}
+
+export function replacementApprovedReplacementSubject(): string {
+  return "You've been added to a service / 你已被安排一场服侍";
+}
+
+export function replacementApprovedReplacementBody(
+  replacementName: string,
+  assignment: NotificationAssignment,
+): string {
+  const en = [
+    `Hi ${replacementName},`,
+    "",
+    `You've been added to serve on ${assignmentLineEn(assignment).slice(2)}.`,
+    "If you have any questions, please contact your team leader.",
+  ].join("\n");
+  const zh = [
+    `${replacementName}你好，`,
+    "",
+    `你已被安排在${assignmentLineZh(assignment).slice(2)}服侍。`,
+    "如有任何问题，请联系你的团队负责人。",
+  ].join("\n");
+  return `${en}\n\n---\n\n${zh}`;
+}
+
+export function replacementDeclinedSubject(): string {
+  return "Your replacement request was declined / 你的换班申请未获批准";
+}
+
+export function replacementDeclinedBody(requesterName: string, assignment: NotificationAssignment): string {
+  const en = [
+    `Hi ${requesterName},`,
+    "",
+    `Your request for coverage on ${assignmentLineEn(assignment).slice(2)} was declined.`,
+    "You are still assigned to this service - please contact your team leader if you have questions.",
+  ].join("\n");
+  const zh = [
+    `${requesterName}你好，`,
+    "",
+    `你在${assignmentLineZh(assignment).slice(2)}的换班申请未获批准。`,
+    "你仍被安排在此场服侍，如有疑问请联系你的团队负责人。",
+  ].join("\n");
+  return `${en}\n\n---\n\n${zh}`;
+}

@@ -16,6 +16,16 @@ export type DashboardMessages = {
   assignmentsColumnTitle: string;
   assignmentsColumnRole: string;
   assignmentsTeammatesTitle: string;
+  requestCoverageButton: string;
+  requestCoverageReasonLabel: string;
+  requestCoverageSubmit: string;
+  requestCoverageSubmitting: string;
+  requestCoverageError: string;
+  requestCoverageCancel: string;
+  coverageRequestedLabel: string;
+  cancelCoverageRequestButton: string;
+  cancellingCoverageRequest: string;
+  cancelCoverageRequestError: string;
 
   availabilityTitle: string;
   availabilityDescription: string;
@@ -56,6 +66,16 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnTitle: "Service",
     assignmentsColumnRole: "Role",
     assignmentsTeammatesTitle: "Team members",
+    requestCoverageButton: "Request coverage",
+    requestCoverageReasonLabel: "Reason (optional)",
+    requestCoverageSubmit: "Submit request",
+    requestCoverageSubmitting: "Submitting…",
+    requestCoverageError: "We couldn't submit your request.",
+    requestCoverageCancel: "Cancel",
+    coverageRequestedLabel: "Coverage requested — pending review",
+    cancelCoverageRequestButton: "Cancel request",
+    cancellingCoverageRequest: "Cancelling…",
+    cancelCoverageRequestError: "We couldn't cancel your request.",
 
     availabilityTitle: "Availability",
     availabilityDescription:
@@ -98,6 +118,16 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnTitle: "服侍",
     assignmentsColumnRole: "角色",
     assignmentsTeammatesTitle: "组员",
+    requestCoverageButton: "申请换班",
+    requestCoverageReasonLabel: "原因（可选）",
+    requestCoverageSubmit: "提交申请",
+    requestCoverageSubmitting: "提交中……",
+    requestCoverageError: "无法提交你的申请。",
+    requestCoverageCancel: "取消",
+    coverageRequestedLabel: "已申请换班，等待审核",
+    cancelCoverageRequestButton: "撤销申请",
+    cancellingCoverageRequest: "撤销中……",
+    cancelCoverageRequestError: "无法撤销你的申请。",
 
     availabilityTitle: "可用时间",
     availabilityDescription: "告诉团队你哪些日期方便服侍。在日期到来之前，你可以随时更新。",

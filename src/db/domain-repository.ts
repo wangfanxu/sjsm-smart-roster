@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import type {
   AvailabilityInput,
@@ -23,6 +24,7 @@ import {
   availability,
   notificationDeliveries,
   planningPeriods,
+  replacementRequests,
   roles,
   rosterCandidates,
   serviceRoleRequirements,
@@ -35,7 +37,42 @@ import { ApiError } from "@/api/errors";
 export function createDomainRepository(
   database: PostgresJsDatabase<typeof schema>,
 ): DomainRepository {
-  return {
+  const requesterUsers = alias(users, "requester_users");
+  const replacementUsers = alias(users, "replacement_users");
+
+  function replacementRequestColumns() {
+    return {
+      id: replacementRequests.id,
+      assignmentId: replacementRequests.assignmentId,
+      status: replacementRequests.status,
+      reason: replacementRequests.reason,
+      requesterId: replacementRequests.requesterId,
+      requesterDisplayName: requesterUsers.displayName,
+      requesterEmail: requesterUsers.email,
+      replacementUserId: replacementRequests.replacementUserId,
+      replacementDisplayName: replacementUsers.displayName,
+      replacementEmail: replacementUsers.email,
+      serviceId: services.id,
+      serviceTitle: services.title,
+      serviceStartsAt: services.startsAt,
+      roleId: roles.id,
+      roleName: roles.name,
+      createdAt: replacementRequests.createdAt,
+    } as const;
+  }
+
+  function replacementRequestsBaseQuery() {
+    return database
+      .select(replacementRequestColumns())
+      .from(replacementRequests)
+      .innerJoin(assignments, eq(replacementRequests.assignmentId, assignments.id))
+      .innerJoin(services, eq(assignments.serviceId, services.id))
+      .innerJoin(roles, eq(assignments.roleId, roles.id))
+      .innerJoin(requesterUsers, eq(replacementRequests.requesterId, requesterUsers.id))
+      .leftJoin(replacementUsers, eq(replacementRequests.replacementUserId, replacementUsers.id));
+  }
+
+  const repository: DomainRepository = {
     async listPlanningPeriods() {
       return database.select().from(planningPeriods).orderBy(asc(planningPeriods.startsOn));
     },
@@ -565,11 +602,16 @@ export function createDomainRepository(
           startsAt: services.startsAt,
           title: services.title,
           role: roles.name,
+          openReplacementRequestId: replacementRequests.id,
         })
         .from(assignments)
         .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
         .innerJoin(services, eq(assignments.serviceId, services.id))
         .innerJoin(roles, eq(assignments.roleId, roles.id))
+        .leftJoin(
+          replacementRequests,
+          and(eq(replacementRequests.assignmentId, assignments.id), eq(replacementRequests.status, "open")),
+        )
         .where(and(...conditions))
         .orderBy(asc(services.startsAt));
     },
@@ -1080,5 +1122,268 @@ export function createDomainRepository(
         })
         .where(eq(notificationDeliveries.id, notificationId));
     },
+
+    async createReplacementRequest(assignmentId: string, requesterId: string, reason: string | null) {
+      const insertedId = await database.transaction(async (transaction) => {
+        const [assignmentRow] = await transaction
+          .select({ id: assignments.id, userId: assignments.userId, status: rosterCandidates.status })
+          .from(assignments)
+          .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
+          .where(eq(assignments.id, assignmentId))
+          .limit(1);
+        if (!assignmentRow) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+        if (assignmentRow.status !== "published") {
+          throw new ApiError(
+            "assignment_not_published",
+            409,
+            "Only an assignment on a published roster can request a replacement",
+          );
+        }
+        if (assignmentRow.userId !== requesterId) {
+          throw new ApiError(
+            "not_your_assignment",
+            403,
+            "You can only request a replacement for your own assignment",
+          );
+        }
+
+        const [existingOpen] = await transaction
+          .select({ id: replacementRequests.id })
+          .from(replacementRequests)
+          .where(
+            and(eq(replacementRequests.assignmentId, assignmentId), eq(replacementRequests.status, "open")),
+          )
+          .limit(1);
+        if (existingOpen) {
+          throw new ApiError(
+            "replacement_request_already_open",
+            409,
+            "There is already an open replacement request for this assignment",
+          );
+        }
+
+        const [inserted] = await transaction
+          .insert(replacementRequests)
+          .values({ assignmentId, requesterId, reason })
+          .returning({ id: replacementRequests.id });
+        await transaction.insert(auditEvents).values({
+          actorUserId: requesterId,
+          action: "replacement_request.created",
+          entityType: "replacement_request",
+          entityId: inserted.id,
+          metadata: { assignmentId },
+        });
+        return inserted.id;
+      });
+
+      const summary = await repository.getReplacementRequestDetail(insertedId);
+      if (!summary) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+      return summary;
+    },
+
+    async listReplacementRequests() {
+      return replacementRequestsBaseQuery().orderBy(desc(replacementRequests.createdAt));
+    },
+
+    async listMyReplacementRequests(requesterId: string) {
+      return replacementRequestsBaseQuery()
+        .where(eq(replacementRequests.requesterId, requesterId))
+        .orderBy(desc(replacementRequests.createdAt));
+    },
+
+    async getReplacementRequestDetail(requestId: string) {
+      const [summary] = await replacementRequestsBaseQuery()
+        .where(eq(replacementRequests.id, requestId))
+        .limit(1);
+      return summary ?? null;
+    },
+
+    async getEligibleReplacementsForRequest(requestId: string) {
+      const [row] = await database
+        .select({
+          serviceId: assignments.serviceId,
+          roleId: assignments.roleId,
+          requesterId: replacementRequests.requesterId,
+        })
+        .from(replacementRequests)
+        .innerJoin(assignments, eq(replacementRequests.assignmentId, assignments.id))
+        .where(eq(replacementRequests.id, requestId))
+        .limit(1);
+      if (!row) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+      const eligible = await repository.listEligibleUsersForServiceRole(row.serviceId, row.roleId);
+      return eligible.filter((candidate) => candidate.userId !== row.requesterId);
+    },
+
+    async approveReplacementRequest(requestId: string, replacementUserId: string, reviewerId: string) {
+      await database.transaction(async (transaction) => {
+        const [requestRow] = await transaction
+          .select({
+            id: replacementRequests.id,
+            status: replacementRequests.status,
+            assignmentId: replacementRequests.assignmentId,
+          })
+          .from(replacementRequests)
+          .where(eq(replacementRequests.id, requestId))
+          .limit(1);
+        if (!requestRow) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+        if (requestRow.status !== "open") {
+          throw new ApiError("replacement_request_not_open", 409, "This replacement request is no longer open");
+        }
+
+        const [assignmentRow] = await transaction
+          .select({
+            serviceId: assignments.serviceId,
+            candidateId: assignments.candidateId,
+            roleId: assignments.roleId,
+          })
+          .from(assignments)
+          .where(eq(assignments.id, requestRow.assignmentId))
+          .limit(1);
+        if (!assignmentRow) throw new ApiError("assignment_not_found", 404, "Assignment not found");
+
+        const [eligibleReplacement] = await transaction
+          .select({ userId: users.id })
+          .from(userRoles)
+          .innerJoin(users, eq(userRoles.userId, users.id))
+          .innerJoin(services, eq(services.id, assignmentRow.serviceId))
+          .leftJoin(
+            availability,
+            and(
+              eq(availability.userId, users.id),
+              sql`${availability.serviceDate} = (${services.startsAt} AT TIME ZONE 'Asia/Singapore')::date`,
+            ),
+          )
+          .where(
+            and(
+              eq(userRoles.roleId, assignmentRow.roleId),
+              eq(users.id, replacementUserId),
+              eq(users.isActive, true),
+              or(isNull(availability.status), ne(availability.status, "unavailable")),
+            ),
+          )
+          .limit(1);
+        if (!eligibleReplacement) {
+          throw new ApiError("ineligible_assignee", 400, "This volunteer is not eligible for this role");
+        }
+
+        const [conflict] = await transaction
+          .select({ id: assignments.id })
+          .from(assignments)
+          .where(
+            and(
+              eq(assignments.candidateId, assignmentRow.candidateId),
+              eq(assignments.serviceId, assignmentRow.serviceId),
+              eq(assignments.userId, replacementUserId),
+              ne(assignments.id, requestRow.assignmentId),
+            ),
+          )
+          .limit(1);
+        if (conflict) {
+          throw new ApiError(
+            "assignment_conflict",
+            409,
+            "This volunteer is already assigned to another role for this service",
+          );
+        }
+
+        await transaction
+          .update(assignments)
+          .set({ userId: replacementUserId, source: "manual", updatedAt: new Date() })
+          .where(eq(assignments.id, requestRow.assignmentId));
+        await transaction
+          .update(replacementRequests)
+          .set({
+            status: "approved",
+            replacementUserId,
+            reviewedBy: reviewerId,
+            updatedAt: new Date(),
+          })
+          .where(eq(replacementRequests.id, requestId));
+        await transaction.insert(auditEvents).values({
+          actorUserId: reviewerId,
+          action: "replacement_request.approved",
+          entityType: "replacement_request",
+          entityId: requestId,
+          metadata: { replacementUserId },
+        });
+      });
+
+      const summary = await repository.getReplacementRequestDetail(requestId);
+      if (!summary) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+      return summary;
+    },
+
+    async declineReplacementRequest(requestId: string, reviewerId: string) {
+      await database.transaction(async (transaction) => {
+        const [requestRow] = await transaction
+          .select({ id: replacementRequests.id, status: replacementRequests.status })
+          .from(replacementRequests)
+          .where(eq(replacementRequests.id, requestId))
+          .limit(1);
+        if (!requestRow) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+        if (requestRow.status !== "open") {
+          throw new ApiError("replacement_request_not_open", 409, "This replacement request is no longer open");
+        }
+
+        await transaction
+          .update(replacementRequests)
+          .set({ status: "declined", reviewedBy: reviewerId, updatedAt: new Date() })
+          .where(eq(replacementRequests.id, requestId));
+        await transaction.insert(auditEvents).values({
+          actorUserId: reviewerId,
+          action: "replacement_request.declined",
+          entityType: "replacement_request",
+          entityId: requestId,
+          metadata: {},
+        });
+      });
+
+      const summary = await repository.getReplacementRequestDetail(requestId);
+      if (!summary) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+      return summary;
+    },
+
+    async cancelReplacementRequest(requestId: string, requesterId: string) {
+      await database.transaction(async (transaction) => {
+        const [requestRow] = await transaction
+          .select({
+            id: replacementRequests.id,
+            status: replacementRequests.status,
+            requesterId: replacementRequests.requesterId,
+          })
+          .from(replacementRequests)
+          .where(eq(replacementRequests.id, requestId))
+          .limit(1);
+        if (!requestRow) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+        if (requestRow.requesterId !== requesterId) {
+          throw new ApiError(
+            "not_your_replacement_request",
+            403,
+            "You can only cancel your own replacement request",
+          );
+        }
+        if (requestRow.status !== "open") {
+          throw new ApiError("replacement_request_not_open", 409, "This replacement request is no longer open");
+        }
+
+        await transaction
+          .update(replacementRequests)
+          .set({ status: "cancelled", updatedAt: new Date() })
+          .where(eq(replacementRequests.id, requestId));
+        await transaction.insert(auditEvents).values({
+          actorUserId: requesterId,
+          action: "replacement_request.cancelled",
+          entityType: "replacement_request",
+          entityId: requestId,
+          metadata: {},
+        });
+      });
+
+      const summary = await repository.getReplacementRequestDetail(requestId);
+      if (!summary) throw new ApiError("replacement_request_not_found", 404, "Replacement request not found");
+      return summary;
+    },
   };
+
+  return repository;
 }

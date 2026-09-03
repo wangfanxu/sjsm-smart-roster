@@ -9,6 +9,8 @@ import { getDashboardMessages } from "./messages";
 import { SongsEditor } from "./SongsEditor";
 import { groupTeammatesByRole } from "./teammates-utils";
 import type { Assignment, Song } from "./types";
+import { buildWhatsAppMessage } from "./whatsapp-message";
+import { WhatsAppMessageDialog } from "./WhatsAppMessageDialog";
 
 type AssignmentsState =
   | { status: "loading" }
@@ -18,8 +20,14 @@ type AssignmentsState =
 export function AssignmentsSection({
   idToken,
   locale,
+  currentUserDisplayName,
   canManageSongs = false,
-}: Readonly<{ idToken: string; locale: Locale; canManageSongs?: boolean }>) {
+}: Readonly<{
+  idToken: string;
+  locale: Locale;
+  currentUserDisplayName: string;
+  canManageSongs?: boolean;
+}>) {
   const messages = getDashboardMessages(locale);
   const [state, setState] = useState<AssignmentsState>({ status: "loading" });
   const [reloadToken, setReloadToken] = useState(0);
@@ -30,6 +38,7 @@ export function AssignmentsSection({
   const [cancellingRequestFor, setCancellingRequestFor] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [songsEditorOpenForService, setSongsEditorOpenForService] = useState<string | null>(null);
+  const [whatsappMessageFor, setWhatsappMessageFor] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +192,16 @@ export function AssignmentsSection({
                   </span>
                 ) : null}
 
+                <div className={styles.coverageRequestRow}>
+                  <button
+                    type="button"
+                    className={styles.retryButton}
+                    onClick={() => setWhatsappMessageFor(assignment.assignmentId)}
+                  >
+                    {messages.whatsappButton}
+                  </button>
+                </div>
+
                 <div className={styles.songsSection}>
                   <div className={styles.songsHeader}>
                     <strong>{messages.songsTitle}</strong>
@@ -238,6 +257,14 @@ export function AssignmentsSection({
                       );
                       setSongsEditorOpenForService(null);
                     }}
+                  />
+                ) : null}
+
+                {whatsappMessageFor === assignment.assignmentId ? (
+                  <WhatsAppMessageDialog
+                    locale={locale}
+                    message={buildWhatsAppMessage(assignment, currentUserDisplayName, locale)}
+                    onClose={() => setWhatsappMessageFor(null)}
                   />
                 ) : null}
 

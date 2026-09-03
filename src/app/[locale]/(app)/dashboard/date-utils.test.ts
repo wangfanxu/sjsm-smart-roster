@@ -63,6 +63,8 @@ describe("sortAssignmentsChronologically", () => {
         role: "Usher",
         teammates: [],
         openReplacementRequestId: null,
+        songs: [],
+        songsPrintingLink: null,
       },
       {
         assignmentId: "a",
@@ -74,6 +76,8 @@ describe("sortAssignmentsChronologically", () => {
         role: "Drummer",
         teammates: [],
         openReplacementRequestId: null,
+        songs: [],
+        songsPrintingLink: null,
       },
     ];
 

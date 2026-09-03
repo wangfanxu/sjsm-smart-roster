@@ -35,6 +35,18 @@ export type ServiceInput = Readonly<{
   requirements: ReadonlyArray<Readonly<{ roleId: string; requiredCount: number }>>;
 }>;
 
+export type ServiceSong = Readonly<{
+  id: string;
+  title: string;
+  youtubeLink: string | null;
+  order: number;
+}>;
+
+export type ServiceSongsInput = Readonly<{
+  songs: ReadonlyArray<Readonly<{ title: string; youtubeLink?: string | null }>>;
+  songsPrintingLink?: string | null;
+}>;
+
 export type ServiceUpdateInput = Readonly<{
   title: string;
   startsAt: Date;
@@ -278,11 +290,20 @@ export interface DomainRepository {
       title: string;
       role: string;
       openReplacementRequestId: string | null;
+      songsPrintingLink: string | null;
     }>
   >;
   listServiceTeammates(serviceIds: ReadonlyArray<string>): Promise<
     Array<{ serviceId: string; userId: string; displayName: string; roleName: string }>
   >;
+  listServiceSongs(
+    serviceIds: ReadonlyArray<string>,
+  ): Promise<Array<ServiceSong & { serviceId: string }>>;
+  replaceServiceSongs(
+    serviceId: string,
+    input: ServiceSongsInput,
+    actorUserId: string,
+  ): Promise<{ songs: ServiceSong[]; songsPrintingLink: string | null }>;
   listEligibleUsersForServiceRole(
     serviceId: string,
     roleId: string,

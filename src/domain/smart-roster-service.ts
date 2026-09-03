@@ -10,6 +10,7 @@ import type {
   PlanningPeriodInput,
   RosterGenerationRequest,
   ServiceInput,
+  ServiceSongsInput,
   ServiceUpdateInput,
 } from "./types";
 import {
@@ -167,6 +168,13 @@ export class SmartRosterService {
       list.push({ userId: teammate.userId, displayName: teammate.displayName, role: teammate.roleName });
       teammatesByService.set(teammate.serviceId, list);
     }
+    const songs = await this.repository.listServiceSongs(serviceIds);
+    const songsByService = new Map<string, Array<{ id: string; title: string; youtubeLink: string | null; order: number }>>();
+    for (const song of songs) {
+      const list = songsByService.get(song.serviceId) ?? [];
+      list.push({ id: song.id, title: song.title, youtubeLink: song.youtubeLink, order: song.order });
+      songsByService.set(song.serviceId, list);
+    }
 
     return assignments.map((assignment) => ({
       ...assignment,
@@ -179,7 +187,12 @@ export class SmartRosterService {
         hour12: false,
       }).format(assignment.startsAt),
       teammates: teammatesByService.get(assignment.serviceId) ?? [],
+      songs: songsByService.get(assignment.serviceId) ?? [],
     }));
+  }
+
+  updateServiceSongs(serviceId: string, input: ServiceSongsInput, actor: Actor) {
+    return this.repository.replaceServiceSongs(serviceId, input, actor.userId);
   }
 
   async generateCandidate(

@@ -117,6 +117,7 @@ export const services = pgTable(
     title: text("title").notNull(),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     notes: text("notes"),
+    songsPrintingLink: text("songs_printing_link"),
     ...timestamps,
   },
   (table) => [
@@ -125,6 +126,24 @@ export const services = pgTable(
       table.startsAt,
       table.title,
     ),
+  ],
+);
+
+export const serviceSongs = pgTable(
+  "service_songs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    youtubeLink: text("youtube_link"),
+    sortOrder: integer("sort_order").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("service_song_order_unique").on(table.serviceId, table.sortOrder),
+    check("service_song_order_positive", sql`${table.sortOrder} > 0`),
   ],
 );
 

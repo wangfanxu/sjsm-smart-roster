@@ -24,6 +24,8 @@ function repositoryStub(): DomainRepository {
     upsertAvailability: vi.fn(),
     listUpcomingAssignments: vi.fn(),
     listServiceTeammates: vi.fn().mockResolvedValue([]),
+    listServiceSongs: vi.fn().mockResolvedValue([]),
+    replaceServiceSongs: vi.fn(),
     listEligibleUsersForServiceRole: vi.fn(),
     getRosterGenerationSource: vi.fn(),
     saveGeneratedCandidate: vi.fn(),
@@ -134,6 +136,7 @@ describe("SmartRosterService", () => {
         title: "Worship",
         role: "Drummer",
         openReplacementRequestId: null,
+        songsPrintingLink: null,
       },
     ]);
     const service = new SmartRosterService(repository, now);
@@ -141,6 +144,75 @@ describe("SmartRosterService", () => {
     await expect(service.listMyUpcomingAssignments("current-user")).resolves.toEqual([
       expect.objectContaining({ serviceDate: "2026-09-05", serviceTime: "09:00" }),
     ]);
+  });
+
+  it("attaches each service's songs to the matching upcoming assignment", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.listUpcomingAssignments).mockResolvedValue([
+      {
+        assignmentId: "assignment-1",
+        serviceId: "service-1",
+        startsAt: new Date("2026-09-05T01:00:00Z"),
+        title: "Worship",
+        role: "Drummer",
+        openReplacementRequestId: null,
+        songsPrintingLink: "https://song.sjsmchinese.org/export-list-page?id=1",
+      },
+      {
+        assignmentId: "assignment-2",
+        serviceId: "service-2",
+        startsAt: new Date("2026-09-12T01:00:00Z"),
+        title: "Worship",
+        role: "Vocals",
+        openReplacementRequestId: null,
+        songsPrintingLink: null,
+      },
+    ]);
+    vi.mocked(repository.listServiceSongs).mockResolvedValue([
+      { serviceId: "service-1", id: "song-1", title: "Amazing Grace", youtubeLink: null, order: 1 },
+      {
+        serviceId: "service-1",
+        id: "song-2",
+        title: "How Great Thou Art",
+        youtubeLink: "https://www.youtube.com/watch?v=abc",
+        order: 2,
+      },
+    ]);
+    const service = new SmartRosterService(repository, now);
+
+    const assignments = await service.listMyUpcomingAssignments("current-user");
+
+    expect(assignments).toEqual([
+      expect.objectContaining({
+        serviceId: "service-1",
+        songs: [
+          { id: "song-1", title: "Amazing Grace", youtubeLink: null, order: 1 },
+          { id: "song-2", title: "How Great Thou Art", youtubeLink: "https://www.youtube.com/watch?v=abc", order: 2 },
+        ],
+      }),
+      expect.objectContaining({ serviceId: "service-2", songs: [] }),
+    ]);
+  });
+
+  it("replaces a service's songs through the repository on behalf of the actor", async () => {
+    const repository = repositoryStub();
+    vi.mocked(repository.replaceServiceSongs).mockResolvedValue({
+      songs: [{ id: "song-1", title: "Amazing Grace", youtubeLink: null, order: 1 }],
+      songsPrintingLink: "https://song.sjsmchinese.org/export-list-page?id=1",
+    });
+    const service = new SmartRosterService(repository, now);
+    const input = {
+      songs: [{ title: "Amazing Grace" }],
+      songsPrintingLink: "https://song.sjsmchinese.org/export-list-page?id=1",
+    };
+
+    const result = await service.updateServiceSongs("service-1", input, { userId: "team-leader" });
+
+    expect(repository.replaceServiceSongs).toHaveBeenCalledWith("service-1", input, "team-leader");
+    expect(result).toEqual({
+      songs: [{ id: "song-1", title: "Amazing Grace", youtubeLink: null, order: 1 }],
+      songsPrintingLink: "https://song.sjsmchinese.org/export-list-page?id=1",
+    });
   });
 
   it("stores generated candidates as drafts with the authenticated administrator", async () => {

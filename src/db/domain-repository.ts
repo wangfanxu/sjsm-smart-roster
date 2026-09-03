@@ -14,6 +14,8 @@ import type {
   RosterGenerationSource,
   ServiceInput,
   ServiceRoleRequirement,
+  ServiceSong,
+  ServiceSongsInput,
   ServiceUpdateInput,
   UserWithRoles,
 } from "@/domain/types";
@@ -28,6 +30,7 @@ import {
   roles,
   rosterCandidates,
   serviceRoleRequirements,
+  serviceSongs,
   services,
   userRoles,
   users,
@@ -603,6 +606,7 @@ export function createDomainRepository(
           title: services.title,
           role: roles.name,
           openReplacementRequestId: replacementRequests.id,
+          songsPrintingLink: services.songsPrintingLink,
         })
         .from(assignments)
         .innerJoin(rosterCandidates, eq(assignments.candidateId, rosterCandidates.id))
@@ -631,6 +635,72 @@ export function createDomainRepository(
         .innerJoin(roles, eq(assignments.roleId, roles.id))
         .where(and(inArray(assignments.serviceId, serviceIds), eq(rosterCandidates.status, "published")))
         .orderBy(asc(roles.name), asc(users.displayName));
+    },
+
+    async listServiceSongs(serviceIds: ReadonlyArray<string>) {
+      if (serviceIds.length === 0) return [];
+      const rows = await database
+        .select({
+          serviceId: serviceSongs.serviceId,
+          id: serviceSongs.id,
+          title: serviceSongs.title,
+          youtubeLink: serviceSongs.youtubeLink,
+          order: serviceSongs.sortOrder,
+        })
+        .from(serviceSongs)
+        .where(inArray(serviceSongs.serviceId, serviceIds))
+        .orderBy(asc(serviceSongs.sortOrder));
+      return rows;
+    },
+
+    async replaceServiceSongs(serviceId: string, input: ServiceSongsInput, actorUserId: string) {
+      return database.transaction(async (transaction) => {
+        const [existing] = await transaction
+          .select({ id: services.id })
+          .from(services)
+          .where(eq(services.id, serviceId))
+          .limit(1);
+        if (!existing) throw new ApiError("service_not_found", 404, "Service not found");
+
+        await transaction.delete(serviceSongs).where(eq(serviceSongs.serviceId, serviceId));
+
+        const songs: ServiceSong[] =
+          input.songs.length === 0
+            ? []
+            : await transaction
+                .insert(serviceSongs)
+                .values(
+                  input.songs.map((song, index) => ({
+                    serviceId,
+                    title: song.title,
+                    youtubeLink: song.youtubeLink ?? null,
+                    sortOrder: index + 1,
+                  })),
+                )
+                .returning({
+                  id: serviceSongs.id,
+                  title: serviceSongs.title,
+                  youtubeLink: serviceSongs.youtubeLink,
+                  order: serviceSongs.sortOrder,
+                })
+                .then((rows) => rows.sort((left, right) => left.order - right.order));
+
+        const [service] = await transaction
+          .update(services)
+          .set({ songsPrintingLink: input.songsPrintingLink ?? null })
+          .where(eq(services.id, serviceId))
+          .returning({ songsPrintingLink: services.songsPrintingLink });
+
+        await transaction.insert(auditEvents).values({
+          actorUserId,
+          action: "service.songs_updated",
+          entityType: "service",
+          entityId: serviceId,
+          metadata: { songCount: songs.length },
+        });
+
+        return { songs, songsPrintingLink: service.songsPrintingLink };
+      });
     },
 
     async listEligibleUsersForServiceRole(serviceId: string, roleId: string) {

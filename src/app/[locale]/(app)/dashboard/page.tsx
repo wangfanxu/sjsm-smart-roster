@@ -27,7 +27,11 @@ export default function DashboardPage() {
         <p>{messages.pageDescription}</p>
       </header>
 
-      <AssignmentsSection idToken={idToken} locale={locale} />
+      <AssignmentsSection
+        idToken={idToken}
+        locale={locale}
+        canManageSongs={profile.systemRole !== "volunteer"}
+      />
       <AvailabilitySection idToken={idToken} locale={locale} />
     </div>
   );

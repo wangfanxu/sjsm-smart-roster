@@ -15,6 +15,8 @@ describe("role permissions", () => {
     expect(hasPermission("team_leader", "assignment:read:self")).toBe(true);
     expect(hasPermission("team_leader", "team:read")).toBe(true);
     expect(hasPermission("team_leader", "replacement:review")).toBe(true);
+    expect(hasPermission("team_leader", "songs:manage")).toBe(true);
+    expect(hasPermission("volunteer", "songs:manage")).toBe(false);
     expect(hasPermission("team_leader", "roster:generate")).toBe(false);
     expect(hasPermission("team_leader", "roster:review")).toBe(false);
     expect(hasPermission("team_leader", "user:manage")).toBe(false);

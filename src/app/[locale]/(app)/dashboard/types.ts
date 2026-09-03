@@ -4,6 +4,13 @@ export type Teammate = Readonly<{
   role: string;
 }>;
 
+export type Song = Readonly<{
+  id: string;
+  title: string;
+  youtubeLink: string | null;
+  order: number;
+}>;
+
 export type Assignment = Readonly<{
   assignmentId: string;
   serviceId: string;
@@ -14,6 +21,8 @@ export type Assignment = Readonly<{
   role: string;
   teammates: ReadonlyArray<Teammate>;
   openReplacementRequestId: string | null;
+  songs: ReadonlyArray<Song>;
+  songsPrintingLink: string | null;
 }>;
 
 export type AvailabilityStatus = "available" | "unavailable" | "preferred";

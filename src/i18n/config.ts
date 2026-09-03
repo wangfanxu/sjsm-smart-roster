@@ -39,18 +39,18 @@ const messages: Record<Locale, Messages> = {
     title: "Serving together, planned fairly.",
     description:
       "SmartRoster helps church coordinators build conflict-free volunteer rosters while keeping people—not algorithms—in control.",
-    principleTitle: "AI assists. People decide.",
+    principleTitle: "The algorithm suggests. People decide.",
     principleDescription:
       "Every suggestion is reviewable, every trade-off is explainable, and no roster is published without an authorized human.",
-    status: "Sprint 1",
-    foundationTitle: "The foundation is ready.",
+    status: "What's built",
+    foundationTitle: "From availability to a published roster.",
     foundationDescription:
-      "This first increment establishes the deployable application, bilingual experience, health endpoint, automated tests, and CI quality gates.",
+      "SmartRoster now covers the full cycle: collecting availability, generating a fair draft roster with an explainable scheduling engine, reviewing and adjusting it by hand, publishing it with automatic notifications, and letting volunteers ask a bilingual AI assistant about their own schedule.",
     foundationItems: [
-      "Next.js App Router",
-      "English and Chinese",
-      "Automated quality checks",
-      "Deployment health endpoint",
+      "Explainable fair-scheduling engine (role fit, availability, workload balance)",
+      "Manual review, locking, and reassignment before publishing",
+      "Self-service availability and schedule for volunteers",
+      "AI conversational assistant for your own schedule (English/Chinese)",
     ],
     signInCta: "Sign in",
     signInTitle: "Sign in to SmartRoster",
@@ -76,18 +76,18 @@ const messages: Record<Locale, Messages> = {
     title: "一起服侍，公平安排。",
     description:
       "SmartRoster 帮助教会负责人建立无冲突的服侍表，同时确保最终决定始终掌握在人手中。",
-    principleTitle: "AI 提供协助，由人做决定。",
+    principleTitle: "系统提供建议，由人做决定。",
     principleDescription:
       "每个建议都可以审核，每项取舍都可以解释；未经授权负责人确认，系统不会发布排班。",
-    status: "Sprint 1",
-    foundationTitle: "项目基础已经就绪。",
+    status: "已实现功能",
+    foundationTitle: "从可用时间到正式发布排班表，一站完成。",
     foundationDescription:
-      "第一个增量建立了可部署的应用、中英文体验、健康检查、自动化测试以及 CI 质量关卡。",
+      "SmartRoster 现已覆盖完整流程：收集可用时间、通过可解释的排班引擎生成公平的排班草案、人工审核调整、正式发布并自动通知，志愿者还可以用中英文双语 AI 助理查询自己的排班。",
     foundationItems: [
-      "Next.js App Router",
-      "中英文支持",
-      "自动化质量检查",
-      "部署健康检查",
+      "可解释的公平排班引擎（角色匹配、可用时间、工作量均衡）",
+      "发布前可人工审核、锁定、手动调整",
+      "志愿者可自助设置可用时间、查看排班",
+      "中英文双语 AI 助理，可查询自己的排班",
     ],
     signInCta: "登录",
     signInTitle: "登录 SmartRoster",

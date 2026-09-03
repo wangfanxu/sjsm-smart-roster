@@ -47,6 +47,14 @@ export type DashboardMessages = {
   songsEditorError: string;
   songsEditorInvalidLink: string;
 
+  whatsappButton: string;
+  whatsappDialogHeading: string;
+  whatsappDialogIntro: string;
+  whatsappCopyButton: string;
+  whatsappCopiedButton: string;
+  whatsappCopyError: string;
+  whatsappCloseButton: string;
+
   availabilityTitle: string;
   availabilityDescription: string;
   availabilityLoading: string;
@@ -116,6 +124,14 @@ const messages: Record<Locale, DashboardMessages> = {
     songsEditorSaving: "Saving…",
     songsEditorError: "We couldn't save the songs.",
     songsEditorInvalidLink: "Enter a valid link starting with http:// or https://",
+
+    whatsappButton: "WhatsApp message",
+    whatsappDialogHeading: "Generate WhatsApp message",
+    whatsappDialogIntro: "Copy the message below and paste it into your WhatsApp group:",
+    whatsappCopyButton: "Copy to clipboard",
+    whatsappCopiedButton: "Copied!",
+    whatsappCopyError: "Couldn't copy automatically — select the text above and copy it manually.",
+    whatsappCloseButton: "Close",
 
     availabilityTitle: "Availability",
     availabilityDescription:
@@ -188,6 +204,14 @@ const messages: Record<Locale, DashboardMessages> = {
     songsEditorSaving: "保存中……",
     songsEditorError: "无法保存诗歌。",
     songsEditorInvalidLink: "请输入以 http:// 或 https:// 开头的有效链接",
+
+    whatsappButton: "WhatsApp 消息",
+    whatsappDialogHeading: "生成 WhatsApp 消息",
+    whatsappDialogIntro: "复制下面的消息，然后粘贴到 WhatsApp 群组中：",
+    whatsappCopyButton: "复制到剪贴板",
+    whatsappCopiedButton: "已复制！",
+    whatsappCopyError: "自动复制失败，请手动选择上方文字并复制。",
+    whatsappCloseButton: "关闭",
 
     availabilityTitle: "可用时间",
     availabilityDescription: "告诉团队你哪些日期方便服侍。在日期到来之前，你可以随时更新。",

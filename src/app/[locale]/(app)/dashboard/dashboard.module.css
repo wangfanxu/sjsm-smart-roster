@@ -249,6 +249,20 @@
   margin-top: 8px;
 }
 
+.whatsappMessageBox {
+  max-height: 400px;
+  padding: 16px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .songsEditorRows {
   display: grid;
   gap: 10px;

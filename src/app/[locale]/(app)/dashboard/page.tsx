@@ -30,6 +30,7 @@ export default function DashboardPage() {
       <AssignmentsSection
         idToken={idToken}
         locale={locale}
+        currentUserDisplayName={profile.displayName}
         canManageSongs={profile.systemRole !== "volunteer"}
       />
       <AvailabilitySection idToken={idToken} locale={locale} />

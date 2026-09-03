@@ -10,9 +10,43 @@
   box-shadow: var(--shadow);
 }
 
+.panelHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .heading {
   margin-bottom: 16px;
   font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.panelFloating {
+  height: 100%;
+  min-height: 0;
+  border-radius: 20px;
+}
+
+.closeButton {
+  display: grid;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible {
+  border-color: var(--accent);
+  outline: none;
 }
 
 .messageList {

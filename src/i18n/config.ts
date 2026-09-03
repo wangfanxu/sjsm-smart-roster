@@ -30,6 +30,8 @@ type Messages = {
   navAdmin: string;
   loading: string;
   comingSoon: string;
+  openAssistant: string;
+  closeAssistant: string;
 };
 
 const messages: Record<Locale, Messages> = {
@@ -70,6 +72,8 @@ const messages: Record<Locale, Messages> = {
     navAdmin: "Administration",
     loading: "Loading…",
     comingSoon: "This screen is coming soon.",
+    openAssistant: "Ask the assistant",
+    closeAssistant: "Close assistant",
   },
   zh: {
     languageNavigationLabel: "语言选择",
@@ -107,6 +111,8 @@ const messages: Record<Locale, Messages> = {
     navAdmin: "管理",
     loading: "加载中……",
     comingSoon: "此页面即将推出。",
+    openAssistant: "咨询助理",
+    closeAssistant: "关闭助理",
   },
 };
 

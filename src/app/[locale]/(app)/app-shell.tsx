@@ -6,6 +6,7 @@ import { useEffect, type ReactNode } from "react";
 import type { Locale } from "@/i18n/config";
 import { getMessages } from "@/i18n/config";
 import { useAuth } from "@/lib/auth-client";
+import { FloatingAssistantButton } from "./assistant/FloatingAssistantButton";
 
 function alternateLocalePath(pathname: string, locale: Locale): string {
   const alternateLocale: Locale = locale === "en" ? "zh" : "en";
@@ -47,7 +48,6 @@ export function AppShell({
         <div className="app-nav-links">
           <Link href={`/${locale}/dashboard`}>{messages.navDashboard}</Link>
           <Link href={`/${locale}/profile`}>{messages.navProfile}</Link>
-          <Link href={`/${locale}/assistant`}>{messages.navAssistant}</Link>
           {profile.systemRole !== "volunteer" ? (
             <Link href={`/${locale}/replacement-requests`}>{messages.navReplacementRequests}</Link>
           ) : null}
@@ -65,6 +65,7 @@ export function AppShell({
         </div>
       </nav>
       <main className="app-main">{children}</main>
+      {pathname.endsWith("/assistant") ? null : <FloatingAssistantButton locale={locale} />}
     </div>
   );
 }

@@ -145,7 +145,7 @@ The intended test pyramid ([architecture.md §9](architecture.md#9-testing-strat
 All tests run against a real PostgreSQL-compatible engine (PGlite) executing the
 actual committed migration — chosen in [ADR 0001](adr/0001-use-drizzle-for-postgresql.md)
 specifically so integration tests exercise real SQL constraints instead of a mocked
-repository. Current suite (`npm test`, Vitest): **17 test files, 127 tests, all
+repository. Current suite (`npm test`, Vitest): **26 test files, 227 tests, all
 passing**.
 
 The conversational assistant (US-07) additionally follows the pattern
@@ -175,6 +175,22 @@ tier for the Capstone demo only) and its production caveat are recorded in
 | `src/i18n/config.test.ts` | English/Simplified Chinese locale configuration required by the product's bilingual UI rule. |
 | `src/lib/health.test.ts` | `/api/health` deployment-verification endpoint. |
 | `src/deployment/apphosting-config.test.ts` | `apphosting.yaml` configuration (e.g. `minInstances`/`maxInstances`) matches the deployment ADR. |
+| `src/migration/bulk-provision-members.test.ts`, `src/migration/export-legacy-firestore-members.test.ts` | Real-member bulk provisioning and the legacy Firestore export tool: role/slug mapping, email deduplication, and the same synthetic-data-only safety guard as the migration spike (OPS-01). |
+
+**Sprint 4 frontend (`src/app/[locale]/(app)`):** pure client-side logic — reducers,
+formatters, and template builders — is unit-tested the same way as the domain
+layer; screens themselves are exercised manually against the deployed app
+(see [§7](#7-manual-verification) for why an authenticated browser session
+can't be automated in this project's environment) plus lint/typecheck/build
+in CI.
+
+| File | Covers |
+| --- | --- |
+| `src/app/[locale]/(app)/assistant/chat-state.test.ts` | The assistant chat reducer: sending a message, a successful/failed reply, the prepare-then-confirm-or-cancel state machine (UI-03). |
+| `src/app/[locale]/(app)/dashboard/date-utils.test.ts` | Locale-aware service date/time formatting and chronological assignment sorting (UI-02). |
+| `src/app/[locale]/(app)/dashboard/teammates-utils.test.ts` | Grouping an assignment's teammates by role for display (UI-02). |
+| `src/app/[locale]/(app)/dashboard/whatsapp-message.test.ts` | The WhatsApp reminder text builder: EN/ZH templates, role grouping (including the viewer's own assignment), and the optional songs/printing-link sections (UI-12). |
+| `src/app/[locale]/(app)/dashboard/messages.test.ts`, `.../profile/messages.test.ts`, `.../replacement-requests/messages.test.ts` | Bilingual UI copy completeness and EN/ZH key parity for each feature area (UI-02, UI-09, UI-10). |
 
 Domain logic (`src/domain`) is tested without a database at all — it depends only
 on the `DomainRepository` interface — while API/schema tests exercise the real
@@ -225,5 +241,60 @@ suite gives evidence for both.
 | US-08 Update availability through conversation | Done (#8) | `POST /api/v1/assistant/ask` (prepare), `POST /api/v1/assistant/confirm`, `src/assistant/confirmation-token.ts` |
 | US-09 Notify assigned volunteers | Done (#9) | `NotificationService.notifyRosterPublished` in `src/notifications/notification-service.ts`, wired from the publish route |
 
-Full acceptance criteria for each story: [capstone-plan.md](capstone-plan.md).
+Sprint 4 added the authenticated frontend for every story above, plus several
+follow-on UI stories not in `capstone-plan.md`'s original numbered list
+(tracked as GitHub issues instead, since they were scoped after the plan was
+written):
+
+| Story | Status | Key code |
+| --- | --- | --- |
+| UI-01 Sign in and navigate the application | Done (#33, PR #38) | `src/app/[locale]/(app)/app-shell.tsx`, `src/lib/auth-client.tsx` |
+| UI-02 Volunteer self-service dashboard | Done (#34, PR #40) | `src/app/[locale]/(app)/dashboard/` |
+| UI-03 Conversational assistant chat interface | Done (#35, PR #39) | `src/app/[locale]/(app)/assistant/` |
+| UI-04 Administrator roster workflow | Done (#36, PR #42) | `src/app/[locale]/(app)/admin/periods/[periodId]/` |
+| UI-05 Member management: list, invite, assign roles | Done (#44, PR #45) | `src/app/[locale]/(app)/admin/members/page.tsx` |
+| UI-06 Auto-generate weekly services, edit/delete | Done (#48, PR #53) | `src/app/[locale]/(app)/admin/periods/[periodId]/page.tsx` |
+| UI-07 Manually reassign an assignment's volunteer | Done (#49, PR #50) | `src/app/[locale]/(app)/admin/periods/[periodId]/candidates/[candidateId]/` |
+| UI-08 Floating assistant icon instead of a nav tab | Done (#51, PR #64) | `src/app/[locale]/(app)/assistant/FloatingAssistantButton.tsx` |
+| UI-09 Self-service profile editing | Done (#54, PR #62) | `src/app/[locale]/(app)/profile/` |
+| UI-10 Replacement/coverage requests | Done (#59, PR #63) | `src/app/[locale]/(app)/replacement-requests/`, `src/app/api/v1/replacement-requests/` |
+| UI-11 Song management per service | Done (#60, PR #65) | `service_songs` table in `src/db/schema.ts`, `PUT /api/v1/services/{serviceId}/songs`, `src/app/[locale]/(app)/dashboard/SongsEditor.tsx` |
+| UI-12 WhatsApp message template generator | Done (#61, PR #66) | `src/app/[locale]/(app)/dashboard/whatsapp-message.ts`, `WhatsAppMessageDialog.tsx` |
+| OPS-01 Bulk-provision real church members | Open (#41) | `scripts/bulk-provision-members.mjs` (design: [legacy-migration-spike.md](legacy-migration-spike.md#real-member-account-migration-built-scriptsbulk-provision-membersmjs)) |
+
+Full acceptance criteria for US-01 through US-09: [capstone-plan.md](capstone-plan.md).
+UI-01 through UI-12 and OPS-01 acceptance criteria are in their respective
+GitHub issues (linked above via issue number).
 Live task tracking: the [GitHub Project board](https://github.com/users/wangfanxu/projects/1) and [issue tracker](https://github.com/wangfanxu/sjsm-smart-roster/issues).
+
+## 7. Manual verification
+
+Sprint 1-3 (the server API) is fully covered by the automated suite above,
+run against a real migrated database. Sprint 4's authenticated frontend adds
+a layer automated tests deliberately don't reach into: this project's
+Firebase Authentication is a real Google sign-in against the live project,
+with no auth emulator and no test-user bypass, so a headless CI browser
+cannot reach an authenticated screen without real credentials — and
+scripting real credentials into CI would mean testing against a production
+identity, which this project avoids. Each Sprint 4 story is therefore
+verified by:
+
+- lint, typecheck, and `next build` in CI (a red build blocks merge), plus
+  the client-side logic that *doesn't* require a signed-in session —
+  reducers, formatters, and template builders — unit-tested the same way as
+  the domain layer (see the file table in §5);
+- a manual, signed-in click-through against the deployed app, covering the
+  golden path and the obvious edge cases for that story (e.g. UI-11's
+  manage/add/remove/save flow, UI-12's copy-to-clipboard and its fallback,
+  UI-08's floating panel open/close/Escape/overlay-click).
+
+UI-01 through UI-10 received this manual pass before merging. **UI-08,
+UI-11, and UI-12 were built and merged by an AI coding agent that has no way
+to obtain a real Google-authenticated session in its environment, so their
+manual click-through is still outstanding** — tracked here rather than
+silently assumed, and should happen before relying on them in a live
+demonstration.
+
+This is a deliberate trade-off recorded here rather than left implicit: it
+trades end-to-end UI test automation for not needing a second, fake identity
+provider solely for testing.

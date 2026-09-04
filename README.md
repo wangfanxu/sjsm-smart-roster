@@ -6,29 +6,34 @@ An explainable AI-assisted church volunteer scheduling platform that generates f
 
 This repository is the new Quantic MSSE Capstone codebase. It does not contain the pre-existing SJSM production application. That application is treated as a legacy reference and pre-Capstone baseline.
 
-Current phase: Sprint 1 foundation.
+All four planned sprints are complete: the Sprint 1-3 server API and domain model, and the Sprint 4 authenticated frontend (sign-in, volunteer dashboard, assistant chat, administrator roster workflow, member management, and several follow-on UI stories — service songs, replacement/coverage requests, a WhatsApp message template generator, and more). The only open item is [OPS-01](https://github.com/wangfanxu/sjsm-smart-roster/issues/41), bulk-provisioning real church member accounts, which is operational rather than a product gap.
+
+- **Live deployment:** https://smart-roster--sjsm-smart-roster.asia-southeast1.hosted.app/en
+- **Task board:** [GitHub Project](https://github.com/users/wangfanxu/projects/1)
+- **Design and testing record:** [docs/design-and-testing.md](docs/design-and-testing.md)
 
 ## Problem
 
 Church service coordinators currently spend significant time creating rosters manually. They must consider member availability, role capability, assignment conflicts, workload fairness, recent service history, and last-minute replacements. The process is difficult to optimize and hard to explain consistently.
 
-SJSM SmartRoster will provide:
+SJSM SmartRoster provides:
 
 - constraint-based roster generation;
 - fair workload distribution;
 - explainable scheduling decisions;
 - human review, locking, regeneration, and publication;
 - natural-language access to personal assignments and availability;
-- email notifications and reminders.
+- email notifications and reminders;
+- a bilingual (English/Simplified Chinese) authenticated web application for both volunteers and administrators.
 
-## Proposed stack
+## Stack
 
 - Next.js App Router for the web application and backend-for-frontend
-- PostgreSQL with Prisma or Drizzle for relational domain data
+- PostgreSQL with Drizzle ORM for relational domain data (see [ADR 0001](docs/adr/0001-use-drizzle-for-postgresql.md))
 - Firebase Authentication for existing user identities
-- Firebase Hosting plus Cloud Run, or Firebase App Hosting, for deployment
+- Firebase App Hosting and Neon PostgreSQL for deployment (see [ADR 0002](docs/adr/0002-use-firebase-app-hosting-and-neon.md))
 - A constraint solver for roster optimization
-- An LLM with controlled tool calling for conversational features
+- Gemini (with controlled tool calling) for conversational features (see [ADR 0003](docs/adr/0003-use-gemini-flash-lite-for-assistant-classification.md))
 - Resend for transactional email
 - GitHub Actions for CI/CD
 
@@ -65,7 +70,7 @@ The application exposes `GET /api/health` for deployment verification. Firebase 
 
 `GET /api/v1/me` is protected by Firebase ID-token verification and returns the application profile resolved from the verified Firebase UID. See [authentication and authorization](docs/authentication-and-authorization.md).
 
-Sprint 1 planning, service, member-role, personal availability, and upcoming-assignment operations are exposed under `/api/v1`. Sprint 2 adds roster generation, review, locking/regeneration, and publication. See the [server API contract](docs/api.md).
+Sprint 1 planning, service, member-role, personal availability, and upcoming-assignment operations are exposed under `/api/v1`. Sprint 2 adds roster generation, review, locking/regeneration, and publication. Sprint 3 adds the conversational assistant and email notifications. Sprint 4 is an authenticated frontend (`src/app/[locale]/(app)`) for every one of the above, plus follow-on stories (member management, manual reassignment, replacement/coverage requests, self-service profile, service songs, a WhatsApp message template generator). See the [server API contract](docs/api.md).
 
 ## Conversational assistant
 

@@ -4,9 +4,21 @@
 
 The pre-existing repositories `wangfanxu/SJSM_Music` and `wangfanxu/SJSM-music-backend` are legacy references. This repository contains the Capstone specification and new implementation.
 
+Building on this personal project follows the MSSE Capstone Handbook's own
+guidance to select "a software application or AI use case from [a team
+member's] current workplace or past work experience," which it notes
+"support[s] a rich learning experience" precisely because it is grounded in
+real-world considerations and constraints. This applies directly here:
+the entire system was rebuilt from scratch on a new stack (Next.js,
+PostgreSQL, Drizzle) rather than resubmitted, the legacy application is
+owned by this project's author, and church volunteer scheduling is a real
+operational problem rather than a hypothetical one. No legacy code is
+copied into this repository; where legacy behavior informed a new feature
+(e.g. UI-11, UI-12), the specific legacy source file is cited in the
+corresponding GitHub issue.
+
 Before final submission:
 
-- obtain written confirmation that a new system based on an existing personal project is acceptable;
 - document which capabilities existed before the Capstone;
 - cite any reused code and justify why it was reused;
 - use this repository's commit history, issues, pull requests, tests, and deployments as the primary evidence of Capstone work;

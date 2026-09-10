@@ -51,3 +51,9 @@ export function formatCalendarDate(serviceDate: string, locale: Locale): string 
 export function sortAssignmentsChronologically(assignments: readonly Assignment[]): Assignment[] {
   return [...assignments].sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 }
+
+/** True if a YYYY-MM-DD calendar date falls in the same year/month as the reference date. */
+export function isInCurrentCalendarMonth(serviceDate: string, reference: Date = new Date()): boolean {
+  const [year, month] = serviceDate.split("-").map(Number);
+  return year === reference.getFullYear() && month === reference.getMonth() + 1;
+}

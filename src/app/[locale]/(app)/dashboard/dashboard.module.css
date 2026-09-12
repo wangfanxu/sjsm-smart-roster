@@ -124,7 +124,7 @@
 
 .assignmentCard {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px 16px;
   align-items: center;
   padding: 14px 18px;
@@ -190,6 +190,7 @@
   grid-column: 1 / 2;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .teammateTagsLabel {
@@ -200,12 +201,13 @@
 }
 
 .teammateTag {
+  max-width: 100%;
   padding: 3px 10px;
+  overflow-wrap: break-word;
   border-radius: 999px;
   background: var(--surface-muted);
   color: var(--ink);
   font-size: 0.8rem;
-  white-space: nowrap;
 }
 
 .coverageRequestRow {

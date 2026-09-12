@@ -4,7 +4,12 @@ import { useEffect, useState } from "react";
 import type { Locale } from "@/i18n/config";
 import { apiFetch, ApiRequestError } from "@/lib/api-client";
 import styles from "./dashboard.module.css";
-import { formatServiceDateTime, sortAssignmentsChronologically } from "./date-utils";
+import {
+  formatCalendarDate,
+  formatServiceDateTime,
+  isInCurrentCalendarMonth,
+  sortAssignmentsChronologically,
+} from "./date-utils";
 import { getDashboardMessages } from "./messages";
 import { SongsEditor } from "./SongsEditor";
 import { groupTeammatesByRole } from "./teammates-utils";
@@ -133,9 +138,36 @@ export function AssignmentsSection({
     }
   }
 
+  const nextServiceLabel =
+    state.status === "ready" && state.assignments.length > 0
+      ? formatCalendarDate(state.assignments[0].serviceDate, locale)
+      : messages.summaryNextServiceEmpty;
+  const thisMonthCount =
+    state.status === "ready"
+      ? state.assignments.filter((assignment) => isInCurrentCalendarMonth(assignment.serviceDate)).length
+      : 0;
+  const totalUpcoming = state.status === "ready" ? state.assignments.length : 0;
+
   return (
     <section className={styles.panel} aria-labelledby="assignments-heading">
       <h2 id="assignments-heading">{messages.assignmentsTitle}</h2>
+
+      {state.status === "ready" ? (
+        <div className={styles.summaryRow}>
+          <div className={styles.summaryTile}>
+            <span className={styles.summaryLabel}>{messages.summaryNextServiceLabel}</span>
+            <span className={styles.summaryValue}>{nextServiceLabel}</span>
+          </div>
+          <div className={styles.summaryTile}>
+            <span className={styles.summaryLabel}>{messages.summaryThisMonthLabel}</span>
+            <span className={styles.summaryValue}>{thisMonthCount}</span>
+          </div>
+          <div className={styles.summaryTile}>
+            <span className={styles.summaryLabel}>{messages.summaryUpcomingLabel}</span>
+            <span className={styles.summaryValue}>{totalUpcoming}</span>
+          </div>
+        </div>
+      ) : null}
 
       {state.status === "loading" ? (
         <p className={styles.statusMessage}>{messages.assignmentsLoading}</p>
@@ -172,24 +204,37 @@ export function AssignmentsSection({
 
       {state.status === "ready" && state.assignments.length > 0 ? (
         <ul className={styles.assignmentList}>
-          {state.assignments.map((assignment) => {
+          {state.assignments.map((assignment, index) => {
             const teammateGroups = groupTeammatesByRole(assignment.teammates);
+            const isFeatured = index === 0;
+            const showSongsSection = isFeatured || assignment.songs.length > 0 || canManageSongs;
+            const showEmptySongsText = isFeatured && assignment.songs.length === 0;
             return (
-              <li key={assignment.assignmentId} className={styles.assignmentCard}>
-                <span className={styles.assignmentWhen}>
-                  {formatServiceDateTime(assignment.serviceDate, assignment.serviceTime, locale)}
-                </span>
+              <li
+                key={assignment.assignmentId}
+                className={isFeatured ? `${styles.assignmentCard} ${styles.assignmentCardFeatured}` : styles.assignmentCard}
+              >
+                <div className={styles.assignmentWhenRow}>
+                  {isFeatured ? (
+                    <span className={styles.nextUpBadge}>{messages.assignmentsNextUpLabel}</span>
+                  ) : null}
+                  <span className={styles.assignmentWhen}>
+                    {formatServiceDateTime(assignment.serviceDate, assignment.serviceTime, locale)}
+                  </span>
+                </div>
                 <span className={styles.assignmentTitle}>{assignment.title}</span>
                 <span className={styles.assignmentRole} aria-label={messages.assignmentsRoleLabel}>
                   {assignment.role}
                 </span>
                 {teammateGroups.length > 0 ? (
-                  <span className={styles.assignmentTeammates}>
-                    <strong>{messages.assignmentsTeammatesTitle}: </strong>
-                    {teammateGroups
-                      .map((group) => `${group.role} — ${group.names.join(", ")}`)
-                      .join(" · ")}
-                  </span>
+                  <div className={styles.assignmentTeammates}>
+                    <span className={styles.teammateTagsLabel}>{messages.assignmentsTeammatesTitle}:</span>
+                    {teammateGroups.map((group) => (
+                      <span key={group.role} className={styles.teammateTag}>
+                        {group.role}: {group.names.join(", ")}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
 
                 <div className={styles.coverageRequestRow}>
@@ -202,44 +247,46 @@ export function AssignmentsSection({
                   </button>
                 </div>
 
-                <div className={styles.songsSection}>
-                  <div className={styles.songsHeader}>
-                    <strong>{messages.songsTitle}</strong>
-                    {canManageSongs ? (
-                      <button
-                        type="button"
-                        className={styles.retryButton}
-                        onClick={() => setSongsEditorOpenForService(assignment.serviceId)}
-                      >
-                        {messages.songsManageButton}
-                      </button>
+                {showSongsSection ? (
+                  <div className={styles.songsSection}>
+                    <div className={styles.songsHeader}>
+                      <strong>{messages.songsTitle}</strong>
+                      {canManageSongs ? (
+                        <button
+                          type="button"
+                          className={styles.retryButton}
+                          onClick={() => setSongsEditorOpenForService(assignment.serviceId)}
+                        >
+                          {messages.songsManageButton}
+                        </button>
+                      ) : null}
+                    </div>
+                    {assignment.songs.length > 0 ? (
+                      <ol className={styles.songsList}>
+                        {assignment.songs.map((song) => (
+                          <li key={song.id}>
+                            <span>{song.title}</span>
+                            {song.youtubeLink ? (
+                              <a href={song.youtubeLink} target="_blank" rel="noreferrer">
+                                {messages.songsWatchLink}
+                              </a>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
+                    ) : showEmptySongsText ? (
+                      <p className={styles.songsEmpty}>{messages.songsEmpty}</p>
+                    ) : null}
+                    {assignment.songsPrintingLink ? (
+                      <p className={styles.songsPrintingLink}>
+                        {messages.songsPrintingLinkLabel}:{" "}
+                        <a href={assignment.songsPrintingLink} target="_blank" rel="noreferrer">
+                          {messages.songsPrintingLinkOpen}
+                        </a>
+                      </p>
                     ) : null}
                   </div>
-                  {assignment.songs.length > 0 ? (
-                    <ol className={styles.songsList}>
-                      {assignment.songs.map((song) => (
-                        <li key={song.id}>
-                          <span>{song.title}</span>
-                          {song.youtubeLink ? (
-                            <a href={song.youtubeLink} target="_blank" rel="noreferrer">
-                              {messages.songsWatchLink}
-                            </a>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className={styles.songsEmpty}>{messages.songsEmpty}</p>
-                  )}
-                  {assignment.songsPrintingLink ? (
-                    <p className={styles.songsPrintingLink}>
-                      {messages.songsPrintingLinkLabel}:{" "}
-                      <a href={assignment.songsPrintingLink} target="_blank" rel="noreferrer">
-                        {messages.songsPrintingLinkOpen}
-                      </a>
-                    </p>
-                  ) : null}
-                </div>
+                ) : null}
 
                 {songsEditorOpenForService === assignment.serviceId ? (
                   <SongsEditor

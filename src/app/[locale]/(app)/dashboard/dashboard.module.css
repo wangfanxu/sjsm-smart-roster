@@ -84,6 +84,36 @@
   color: var(--muted);
 }
 
+.summaryRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.summaryTile {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--background);
+}
+
+.summaryLabel {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.summaryValue {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
 .assignmentList {
   display: grid;
   gap: 12px;
@@ -101,6 +131,31 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--background);
+}
+
+.assignmentCardFeatured {
+  border-color: var(--accent);
+  background: var(--surface-muted);
+}
+
+.assignmentWhenRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.nextUpBadge {
+  display: inline-flex;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .assignmentWhen {
@@ -130,9 +185,27 @@
 }
 
 .assignmentTeammates {
+  display: flex;
+  flex-wrap: wrap;
   grid-column: 1 / 2;
+  align-items: center;
+  gap: 6px;
+}
+
+.teammateTagsLabel {
+  margin-right: 2px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.teammateTag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 .coverageRequestRow {

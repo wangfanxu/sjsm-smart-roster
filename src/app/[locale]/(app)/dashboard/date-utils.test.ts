@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCalendarDate,
   formatServiceDateTime,
+  isInCurrentCalendarMonth,
   isPastDate,
   sortAssignmentsChronologically,
   todayIsoDate,
@@ -26,6 +27,20 @@ describe("isPastDate", () => {
 
   it("treats future dates as not past", () => {
     expect(isPastDate("2026-08-29", "2026-08-28")).toBe(false);
+  });
+});
+
+describe("isInCurrentCalendarMonth", () => {
+  it("matches a date in the same year and month as the reference", () => {
+    expect(isInCurrentCalendarMonth("2026-09-05", new Date(2026, 8, 1))).toBe(true);
+  });
+
+  it("does not match a date in a different month", () => {
+    expect(isInCurrentCalendarMonth("2026-10-01", new Date(2026, 8, 30))).toBe(false);
+  });
+
+  it("does not match the same month in a different year", () => {
+    expect(isInCurrentCalendarMonth("2025-09-05", new Date(2026, 8, 1))).toBe(false);
   });
 });
 

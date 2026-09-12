@@ -16,6 +16,12 @@ export type DashboardMessages = {
   assignmentsColumnTitle: string;
   assignmentsColumnRole: string;
   assignmentsTeammatesTitle: string;
+  assignmentsNextUpLabel: string;
+
+  summaryNextServiceLabel: string;
+  summaryNextServiceEmpty: string;
+  summaryThisMonthLabel: string;
+  summaryUpcomingLabel: string;
   requestCoverageButton: string;
   requestCoverageReasonLabel: string;
   requestCoverageSubmit: string;
@@ -94,6 +100,13 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnTitle: "Service",
     assignmentsColumnRole: "Role",
     assignmentsTeammatesTitle: "Team members",
+    assignmentsNextUpLabel: "Next up",
+
+    summaryNextServiceLabel: "Next service",
+    summaryNextServiceEmpty: "—",
+    summaryThisMonthLabel: "This month",
+    summaryUpcomingLabel: "Total upcoming",
+
     requestCoverageButton: "Request coverage",
     requestCoverageReasonLabel: "Reason (optional)",
     requestCoverageSubmit: "Submit request",
@@ -174,6 +187,13 @@ const messages: Record<Locale, DashboardMessages> = {
     assignmentsColumnTitle: "服侍",
     assignmentsColumnRole: "角色",
     assignmentsTeammatesTitle: "组员",
+    assignmentsNextUpLabel: "最近一次",
+
+    summaryNextServiceLabel: "下次服侍",
+    summaryNextServiceEmpty: "—",
+    summaryThisMonthLabel: "本月安排",
+    summaryUpcomingLabel: "即将到来",
+
     requestCoverageButton: "申请换班",
     requestCoverageReasonLabel: "原因（可选）",
     requestCoverageSubmit: "提交申请",
